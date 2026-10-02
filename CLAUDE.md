@@ -3,7 +3,7 @@
 Read `claude/wow-forever-addons-overview.md` (project doc) first.
 
 ## Layout
-- `UISnapshot/UISnapshot.toc`, `UISnapshot.lua` (logic and slash commands) and `EditModeApply.lua` (experimental add-only Edit Mode apply with backups), `Minimap.lua` (own minimap button, no library) and `UI.lua` (button window and import box; wraps `ns.commands`, adds no restore logic) and `Codec.lua` (export text format; pure Lua, no WoW calls). Interface 16001, plain `.toc`, `## SavedVariables: UISnapshotDB`.
+- `UISnapshot/UISnapshot.toc`, `UISnapshot.lua` (logic and slash commands) and `Minimap.lua` (own minimap button, no library) and `UI.lua` (button window and import box; wraps `ns.commands`, adds no restore logic) and `Codec.lua` (export text format; pure Lua, no WoW calls). Interface 16001, plain `.toc`, `## SavedVariables: UISnapshotDB`.
 - `tests/codec_test.py`: round-trip, damage and fuzz tests for `Codec.lua` under Lua 5.1.
 - `tests/mock_test.py`: runs the Lua under Lua 5.1 (lupa) against a simulated client. Not the live client.
 - `tools/package.sh`, `.github/workflows/package.yml`: build `UISnapshot-v<Version>-forever.zip` from the `.toc` version.
@@ -19,10 +19,13 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Everything imported goes through `sanitizeProfile` (known fields only, types and sizes checked, CVar names `^[%w_]+$`). Add new profile fields there or they are dropped on import.
 - Edit Mode layouts are still never applied from code, imported or not.
 
-## Edit Mode apply rules (keep these)
-- Add-only, backup first, never overwrite, refuse in combat or with Edit Mode open, pcall every call, fall back to the manual string route.
-- Default OFF until the user has watched it work once. Do not turn it on by default without live confirmation.
-- `GetLayouts()` lists custom layouts only; `SetActiveLayout` may count presets. The offset is derived from the currently active layout; if that cannot be derived, do not guess.
+## Edit Mode
+- Auto-applying Edit Mode layouts was tried in 0.4.0 (add-only, with backups) and did not work in the beta (user report, 1 Oct 2026), so it was removed. Do not re-add it without a verified approach: the wiki marks `C_EditMode.SaveLayouts`/`SetActiveLayout` `AllowedWhenUntainted`, and LibEditModeOverride says it cannot create layouts from strings. Layouts stay manual (saved as strings, pasted into Edit Mode's Import).
+
+## Game settings rules (keep these)
+- Capture = every CVar changed from default (via `C_Console.GetAllCommands` + `C_CVar.GetCVarInfo`) plus the tracked list, minus the deny list. The deny list also applies on load, so an imported profile cannot set machine-specific settings.
+- Importing must not add names to the tracked list (it did in 0.3.0 and polluted it).
+- Action bars: `GetActionBarToggles`/`SetActionBarToggles`; the second only registers state for the next load, so it needs the reload. Slot `i` is shown as "Action Bar i+1" (naming from the wiki's description, not verified in Forever).
 
 ## Confirmed vs untested (update when you learn more)
 - Confirmed in the Forever beta, 1 Oct 2026 (user screenshots/export): `C_EditMode.GetLayouts()` and `ConvertLayoutInfoToString` work (6 custom layouts exported as strings); `GetChatWindowInfo` works (10 windows); all 7 default CVar names returned values; 26 addons listed; `/uisnap save`, `show` and `editmode` ran and the copy box opened and showed the strings.
@@ -30,6 +33,7 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Confirmed by user test, 1 Oct 2026 (screenshots, visual check only): after `/uisnap save` then moving two chat windows, `/uisnap load` put them back in their saved bottom-centre positions and the custom channels on all three windows looked right.
 - Confirmed by user test, 1 Oct 2026: `diff` listed a flipped `chatMouseScroll` CVar, `load` restored it, and a second `diff` reported all CVars match.
 - Confirmed in the beta 1 Oct 2026 (user screenshot and report): the button window opens and renders; Save, Delete, list selection and the output log work; saving and loading the UI on another character worked.
-- Untested in the live client (0.4.0): auto-reload via `ReloadUI`, post-reload report, minimap button, checkboxes, Edit Mode apply (wiki marks SaveLayouts/SetActiveLayout `AllowedWhenUntainted`; LibEditModeOverride says it cannot create layouts from strings). Also: Export and Import (0.3.0; the clipboard path for ~21,000 characters is the open question), the rest of the button window (0.2.0; the mock frame accepts any method, so it does not prove real widget calls exist), `addons`, the `GetPhysicalScreenSize` warning, dock/undock restore, creating missing chat windows, pasting a saved Edit Mode string into Import, and the 0.1.1 active-layout name.
+- Confirmed in the beta 1 Oct 2026 (user): chat windows restored to the right places on the new character; action bars (and other game settings) were NOT restored in 0.4.0 because only 7 CVars were tracked. 0.5.0 fixes that in code; not yet seen working live.
+- Untested in the live client (0.5.0): capture/restore of all changed CVars, action bar toggles, the deny list, auto-reload via `ReloadUI`, post-reload report, minimap button, Export/Import with large profiles.
 - `show` prints UI-unit size (`GetScreenWidth/Height`, 4096x1152 at scale 0.667 in the test) and, from 0.1.1, the physical window size.
 - Launch install path and whether WTF files carry over are unconfirmed.

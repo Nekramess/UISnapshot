@@ -1,4 +1,4 @@
--- UI Snapshot 0.4.0
+-- UI Snapshot 0.5.0
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -41,7 +41,6 @@ local function db()
     d.cvars = d.cvars or {}
     d.settings = d.settings or {}
     if d.settings.autoReload == nil then d.settings.autoReload = true end
-    if d.settings.applyEditMode == nil then d.settings.applyEditMode = false end
     d.settings.minimap = d.settings.minimap or { hide = false, angle = 215 }
     if #d.cvars == 0 then
         for _, name in ipairs(DEFAULT_CVARS) do d.cvars[#d.cvars + 1] = name end
@@ -101,13 +100,88 @@ local function captureChat()
     return out
 end
 
+---------------------------------------------------------------------------
+-- Game settings (CVars) and action bar toggles
+---------------------------------------------------------------------------
+
+-- Settings that belong to this computer or this session rather than to a UI.
+-- They are never captured and never applied, even from an imported profile.
+local DENY_PREFIXES = { "gx", "last", "sound_output", "videooptions", "hwdetect", "installtype",
+    "locale", "textlocale", "audiolocale", "accountname", "portal", "realm", "wowversion" }
+
+local function isDenied(name)
+    local l = tostring(name):lower()
+    for _, pre in ipairs(DENY_PREFIXES) do
+        if l:sub(1, #pre) == pre then return true end
+    end
+    return false
+end
+ns.isDeniedCVar = isDenied
+
+local function cvarInfoFn()
+    return (C_CVar and C_CVar.GetCVarInfo) or _G.GetCVarInfo
+end
+
+-- value, default, lockedFromUser, readOnly
+local function cvarInfo(name)
+    local f = cvarInfoFn()
+    if not f then return nil end
+    local ok, v, d, _, _, locked, _, ro = pcall(f, name)
+    if not ok then return nil end
+    return v, d, locked, ro
+end
+
+local function allCVarNames()
+    local get = C_Console and C_Console.GetAllCommands
+    if not get then return nil end
+    local ok, cmds = pcall(get)
+    if not ok or type(cmds) ~= "table" then return nil end
+    local cvarType = (Enum and Enum.ConsoleCommandType and Enum.ConsoleCommandType.Cvar) or 0
+    local names = {}
+    for _, c in ipairs(cmds) do
+        if c.commandType == cvarType and type(c.command) == "string" then names[#names + 1] = c.command end
+    end
+    return names
+end
+
+-- Every CVar that differs from its default (minus the deny list), plus the tracked list.
+-- Returns the table and a small summary of how it was gathered.
 local function captureCVars()
-    local out = {}
+    local out, info = {}, { mode = "tracked list only", scanned = 0 }
+    local names = allCVarNames()
+    if names and cvarInfoFn() then
+        info.mode = "all changed from default"
+        for _, name in ipairs(names) do
+            if not isDenied(name) then
+                info.scanned = info.scanned + 1
+                local v, d, locked, ro = cvarInfo(name)
+                if v ~= nil and d ~= nil and v ~= d and not locked and not ro then out[name] = v end
+            end
+        end
+    end
     for _, name in ipairs(db().cvars) do
         local v = GetCVar(name)
-        if v ~= nil then out[name] = v end
+        if v ~= nil and not isDenied(name) then out[name] = v end
     end
-    return out
+    return out, info
+end
+
+-- Action bars 2-8 on/off. bars[1] is "Action Bar 2" ... bars[7] is "Action Bar 8"
+-- (naming follows the wiki's description of GetActionBarToggles).
+local function captureActionBars()
+    if not GetActionBarToggles then return nil end
+    local t = { pcall(GetActionBarToggles) }
+    if not t[1] then return nil end
+    local bars = {}
+    for i = 2, math.min(#t, 8) do bars[i - 1] = t[i] and true or false end
+    return { bars = bars, alwaysShow = _G.ALWAYS_SHOW_MULTIBARS }
+end
+
+local function barsText(ab)
+    if not (ab and ab.bars) then return "not captured" end
+    local on = {}
+    for i, v in ipairs(ab.bars) do if v then on[#on + 1] = tostring(i + 1) end end
+    return #on > 0 and ("Action Bar " .. table.concat(on, ", ")) or "none of bars 2-8"
 end
 
 local function captureAddons()
@@ -142,7 +216,7 @@ local function captureEditMode()
     for _, layout in ipairs(info.layouts or {}) do
         local str = try(C_EditMode.ConvertLayoutInfoToString, layout)
         if str then
-            out.layouts[#out.layouts + 1] = { name = layout.layoutName, str = str, layoutType = layout.layoutType }
+            out.layouts[#out.layouts + 1] = { name = layout.layoutName, str = str, }
         end
     end
     -- GetLayouts() lists custom layouts only, so activeLayout may be offset by the
@@ -163,10 +237,12 @@ local function capture(name)
         screen = { uiScale = UIParent:GetScale(), width = GetScreenWidth(), height = GetScreenHeight() },
         physical = try(function() local w, h = GetPhysicalScreenSize(); return { w = w, h = h } end),
         chat = captureChat(),
-        cvars = captureCVars(),
+        cvars = nil,   -- set below
+        actionBars = captureActionBars(),
         addons = captureAddons(),
         editMode = captureEditMode(),
     }
+    profile.cvars, profile.cvarInfo = captureCVars()
     db().profiles[name] = profile
     return profile
 end
@@ -221,14 +297,36 @@ local function applyChat(chat)
     return ok, failed
 end
 
+-- Sets every saved CVar that differs from its current value. useUiScale goes first
+-- because uiScale depends on it. Returns counts and the names that could not be set.
 local function applyCVars(cvars)
-    local ok, failed = 0, 0
-    for name, value in pairs(cvars) do
-        local set = C_CVar and C_CVar.SetCVar or SetCVar
-        local good, result = pcall(set, name, value)
-        if good and result ~= false then ok = ok + 1 else failed = failed + 1 end
+    local set = (C_CVar and C_CVar.SetCVar) or SetCVar
+    local r = { changed = 0, matched = 0, skipped = 0, failed = {} }
+    local function one(n)
+        local value = cvars[n]
+        if isDenied(n) then r.skipped = r.skipped + 1; return end
+        if GetCVar(n) == value then r.matched = r.matched + 1; return end
+        local ok, res = pcall(set, n, value)
+        if ok and res ~= false then r.changed = r.changed + 1 else r.failed[#r.failed + 1] = n end
     end
-    return ok, failed
+    if cvars.useUiScale ~= nil then one("useUiScale") end
+    if cvars.uiScale ~= nil then one("uiScale") end
+    local names = {}
+    for n in pairs(cvars) do
+        if n ~= "useUiScale" and n ~= "uiScale" then names[#names + 1] = n end
+    end
+    table.sort(names)
+    for _, n in ipairs(names) do one(n) end
+    return r
+end
+
+-- SetActionBarToggles stores the wanted state for the next load, so this needs the reload.
+local function applyActionBars(ab)
+    if not (ab and ab.bars and SetActionBarToggles) then return false end
+    local b = ab.bars
+    local always = ab.alwaysShow
+    if always == nil then always = _G.ALWAYS_SHOW_MULTIBARS end
+    return (pcall(SetActionBarToggles, b[1], b[2], b[3], b[4], b[5], b[6], b[7], always))
 end
 
 -- Compare the saved enabled-addon list with what is enabled now.
@@ -345,11 +443,21 @@ local function sanitizeProfile(p)
             end
         end
     end
+    if type(p.actionBars) == "table" and type(p.actionBars.bars) == "table" then
+        local bars = {}
+        for i = 1, 7 do bars[i] = p.actionBars.bars[i] and true or false end
+        local always = p.actionBars.alwaysShow
+        if not (type(always) == "boolean" or type(always) == "number" or (type(always) == "string" and #always <= 10)) then always = nil end
+        out.actionBars = { bars = bars, alwaysShow = always }
+    end
+    if type(p.cvarInfo) == "table" then
+        out.cvarInfo = { mode = str(p.cvarInfo.mode, 60) or "?", scanned = num(p.cvarInfo.scanned) or 0 }
+    end
     if type(p.cvars) == "table" then
         local n = 0
         for k, v in pairs(p.cvars) do
             local value = (type(v) == "string" or type(v) == "number" or type(v) == "boolean") and tostring(v)
-            if type(k) == "string" and #k <= 64 and k:match("^[%w_]+$") and value and #value <= 200 and n < 200 then
+            if type(k) == "string" and #k <= 64 and k:match("^[%w_]+$") and value and #value <= 200 and n < 1500 then
                 out.cvars[k] = value
                 n = n + 1
             end
@@ -364,7 +472,7 @@ local function sanitizeProfile(p)
             for i = 1, math.min(#p.editMode.layouts, 30) do
                 local l = p.editMode.layouts[i]
                 if type(l) == "table" and str(l.str, 60000) and str(l.name, 100) then
-                    out.editMode.layouts[#out.editMode.layouts + 1] = { name = l.name, str = l.str, layoutType = (l.layoutType == 2) and 2 or 1 }
+                    out.editMode.layouts[#out.editMode.layouts + 1] = { name = l.name, str = l.str }
                 end
             end
         end
@@ -390,19 +498,17 @@ function ns.importString(text, saveAs, force)
     if db().profiles[name] and not force then return false, "exists", name end
     clean.importedOn = date("%Y-%m-%d %H:%M")
     db().profiles[name] = clean
-    -- Keep imported CVar names tracked so future saves include them.
-    local tracked = {}
-    for _, c in ipairs(db().cvars) do tracked[c] = true end
-    for c in pairs(clean.cvars) do
-        if not tracked[c] then db().cvars[#db().cvars + 1] = c end
-    end
     local names = {}
     for c in pairs(clean.cvars) do names[#names + 1] = c end
     table.sort(names)
     say(("Imported '%s': %d chat windows, %d CVars, %d addons, %d Edit Mode layouts."):format(
         name, count(clean.chat), #names, #clean.addons, #clean.editMode.layouts))
     if #names > 0 then
-        say("Load will set these CVars: " .. table.concat(names, ", ") .. ". Check them with Details or Diff first if the export came from someone else.")
+        local shown = {}
+        for i = 1, math.min(#names, 12) do shown[i] = names[i] end
+        say("Load will set these game settings: " .. table.concat(shown, ", ")
+            .. (#names > 12 and (" ...and " .. (#names - 12) .. " more") or "")
+            .. ". /uisnap cvars " .. name .. " lists them all; check them first if the export came from someone else.")
     end
     if ns.refresh then ns.refresh() end
     return name
@@ -474,8 +580,12 @@ local commands = {}
 function commands.save(name)
     name = (name and name ~= "") and name or "default"
     local p = capture(name)
-    say(("Saved '%s': %d chat windows, %d CVars, %d addons, %d Edit Mode layouts.")
-        :format(name, count(p.chat), count(p.cvars), #p.addons, #p.editMode.layouts))
+    say(("Saved '%s': %d chat windows, %d addons, %d Edit Mode layouts."):format(name, count(p.chat), #p.addons, #p.editMode.layouts))
+    if p.cvarInfo and p.cvarInfo.scanned > 0 then
+        say(("Game settings: %d CVars changed from default (of %d checked), %s."):format(count(p.cvars), p.cvarInfo.scanned, "action bars: " .. barsText(p.actionBars)))
+    else
+        say(("Game settings: only the %d tracked CVars were saved (the list-all-CVars call is not available here); action bars: %s."):format(count(p.cvars), barsText(p.actionBars)))
+    end
     if p.editMode.error then say("Edit Mode: " .. p.editMode.error) end
     if ns.refresh then ns.refresh() end
 end
@@ -491,11 +601,12 @@ end
 
 function commands.show(name)
     local p = need(name); if not p then return end
-    say(("%s: %d chat windows, %d CVars, %d addons, %d Edit Mode layouts, UI scale %.3f, UI size %dx%d%s")
-        :format(name, count(p.chat), count(p.cvars), #p.addons, #p.editMode.layouts,
+    say(("%s: %d chat windows, %d CVars (%s), %d addons, %d Edit Mode layouts, UI scale %.3f, UI size %dx%d%s")
+        :format(name, count(p.chat), count(p.cvars), (p.cvarInfo and p.cvarInfo.mode) or "tracked list only", #p.addons, #p.editMode.layouts,
             (p.screen and p.screen.uiScale) or 0, (p.screen and p.screen.width) or 0,
             (p.screen and p.screen.height) or 0,
             (p.physical and p.physical.w) and (", window " .. p.physical.w .. "x" .. p.physical.h) or ""))
+    say("Action bars saved: " .. barsText(p.actionBars) .. ". /uisnap cvars " .. name .. " lists every saved setting.")
     say("Edit Mode active layout: " .. tostring(p.editMode.active or "not detected")
         .. " (raw index " .. tostring(p.editMode.activeIndex) .. ")")
 end
@@ -507,14 +618,28 @@ function commands.diff(name)
     say(("Addons: %d saved but not enabled now, %d enabled now but not in the profile."):format(#missing, #extra))
     if #missing > 0 then say("Not enabled / not installed: " .. table.concat(missing, ", ")) end
     if #extra > 0 then say("Not in profile: " .. table.concat(extra, ", ")) end
-    local changed = 0
+    local diffs = {}
     for cv, v in pairs(p.cvars) do
-        if GetCVar(cv) ~= v then
-            changed = changed + 1
-            say(("CVar %s: now %s, saved %s"):format(cv, tostring(GetCVar(cv)), tostring(v)))
+        if not isDenied(cv) and GetCVar(cv) ~= v then diffs[#diffs + 1] = cv end
+    end
+    table.sort(diffs)
+    if #diffs == 0 then
+        say("CVars: all " .. count(p.cvars) .. " saved settings match.")
+    else
+        say(("CVars: %d of %d saved settings differ from now."):format(#diffs, count(p.cvars)))
+        for i = 1, math.min(#diffs, 25) do
+            say(("  %s: now %s, saved %s"):format(diffs[i], tostring(GetCVar(diffs[i])), tostring(p.cvars[diffs[i]])))
+        end
+        if #diffs > 25 then say(("  ...and %d more."):format(#diffs - 25)) end
+    end
+    local nowBars = captureActionBars()
+    if p.actionBars and nowBars then
+        if barsText(p.actionBars) == barsText(nowBars) then
+            say("Action bars: match (" .. barsText(nowBars) .. ").")
+        else
+            say("Action bars: now " .. barsText(nowBars) .. ", saved " .. barsText(p.actionBars) .. ".")
         end
     end
-    if changed == 0 then say("CVars: all match.") end
 end
 
 function commands.load(name)
@@ -522,20 +647,29 @@ function commands.load(name)
     if InCombatLockdown() then say("Not in combat, please."); return end
     ns.beginCapture()
     warnIfResolutionDiffers(p)
-    local cOk, cFail = applyCVars(p.cvars)
+    if p.actionBars then
+        if applyActionBars(p.actionBars) then
+            say("Action bars set to: " .. barsText(p.actionBars) .. " (shows after the reload).")
+        else
+            say("Could not set the action bars; turn them on in the game's settings.")
+        end
+    end
+    local r = applyCVars(p.cvars)
     local hOk, hFail = applyChat(p.chat)
-    say(("Applied '%s': CVars %d ok / %d failed; chat steps %d ok / %d failed."):format(name, cOk, cFail, hOk, hFail))
+    say(("Applied '%s': %d CVars changed, %d already matched, %d could not be set; chat steps %d ok / %d failed."):format(
+        name, r.changed, r.matched, #r.failed, hOk, hFail))
+    if #r.failed > 0 then
+        local shown = {}
+        for i = 1, math.min(#r.failed, 15) do shown[i] = r.failed[i] end
+        say("Could not set: " .. table.concat(shown, ", ") .. (#r.failed > 15 and (" ...and " .. (#r.failed - 15) .. " more") or ""))
+    end
     local missing = addonDiff(p.addons)
     if #missing > 0 then
         say(#missing .. " saved addons are not enabled; /uisnap diff " .. name .. " lists them.")
     end
     if #p.editMode.layouts > 0 then
-        if db().settings.applyEditMode and ns.applyEditMode then
-            ns.applyEditMode(p)
-        else
-            say("Edit Mode layouts were not applied: /uisnap editmode " .. name
-                .. " has the strings to paste into Edit Mode > Layout > Import, or turn on \"Apply Edit Mode layouts on Load\".")
-        end
+        say("Edit Mode layouts are not applied automatically: use the Edit Mode strings button (or /uisnap editmode "
+            .. name .. ") and paste one into Edit Mode > Layout > Import.")
     end
     ns.afterChange(ns.endCapture())
 end
@@ -590,6 +724,31 @@ function commands.cvar(arg)
     end
 end
 
+function commands.cvars(name)
+    local p = need(name); if not p then return end
+    local names = {}
+    for n in pairs(p.cvars) do names[#names + 1] = n end
+    table.sort(names)
+    local lines = {}
+    for _, n in ipairs(names) do lines[#lines + 1] = n .. " = " .. tostring(p.cvars[n]) end
+    if #lines == 0 then say("No CVars saved in '" .. name .. "'."); return end
+    showCopyBox(("%d saved settings in '%s'"):format(#lines, name), table.concat(lines, "\n"))
+end
+
+-- Prints what the game reports for the action bars, to help find where they are stored.
+function commands.bars()
+    local t = GetActionBarToggles and { pcall(GetActionBarToggles) } or nil
+    if not t or not t[1] then say("GetActionBarToggles is not available."); return end
+    local parts = {}
+    for i = 2, #t do parts[#parts + 1] = tostring(t[i]) end
+    say("GetActionBarToggles: " .. table.concat(parts, ", "))
+    for i = 1, 8 do
+        local v = _G["SHOW_MULTI_ACTIONBAR_" .. i]
+        if v ~= nil then say(("SHOW_MULTI_ACTIONBAR_%d = %s"):format(i, tostring(v))) end
+    end
+    say("ALWAYS_SHOW_MULTIBARS = " .. tostring(_G.ALWAYS_SHOW_MULTIBARS))
+end
+
 function commands.export(name)
     local p = need(name); if not p then return end
     local ok, text = pcall(ns.codec.encode, { v = EXPORT_VERSION, name = name, profile = p })
@@ -604,7 +763,7 @@ function commands.import()
 end
 
 function commands.help()
-    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export <name>, list, import, addons <name>, editmode <name>, cvar [add|remove <name>]")
+    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars <name>, list, import, bars, addons <name>, editmode <name>, minimap, cvar [add|remove <name>]")
 end
 
 SLASH_UISNAPSHOT1 = "/uisnap"

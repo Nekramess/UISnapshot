@@ -9,9 +9,46 @@ lua.globals().print = lambda *a: printed.append(" ".join(str(x) for x in a))
 
 lua.execute(r'''
 NUM_CHAT_WINDOWS = 3
-local cv = { uiScale = "0.64", useUiScale = "1", chatStyle = "classic" }
-function GetCVar(n) return cv[n] end
-C_CVar = { SetCVar = function(n, v) cv[n] = v; return true end }
+-- name = { value, default, locked?, readonly? }
+CV = {
+  uiScale = { "0.64", "1" }, useUiScale = { "1", "0" }, chatStyle = { "classic", "im" },
+  chatClassColorOverride = { "0", "0" }, whisperMode = { "inline", "inline" }, chatMouseScroll = { "1", "1" }, showTutorials = { "0", "1" },
+  autoLootDefault = { "1", "0" }, nameplateShowEnemies = { "1", "0" }, floatingCombatTextCombatDamage = { "1", "1" },
+  alwaysShowActionBars = { "1", "0" }, cameraDistanceMaxZoomFactor = { "2.6", "1.9" }, Sound_MasterVolume = { "0.4", "1" },
+  -- machine- or session-specific: must never be captured or applied
+  gxWindow = { "1", "1" }, gxResolution = { "3840x1080", "1024x768" }, gxMaximize = { "0", "1" },
+  lastCharacterIndex = { "3", "0" }, Sound_OutputDriverName = { "Speakers", "" }, locale = { "enUS", "enUS" },
+  textLocale = { "deDE", "enUS" }, accountName = { "ANTHONY", "" }, portal = { "US", "US" }, realmName = { "Test", "" },
+  -- cannot be changed by the user
+  lockedThing = { "9", "1", true, false }, readonlyThing = { "9", "1", false, true },
+  -- cannot be set (SetCVar refuses)
+  refusesToSet = { "5", "1" },
+}
+SETS = {}
+function GetCVar(n) return CV[n] and CV[n][1] or nil end
+C_CVar = {
+  SetCVar = function(n, v)
+    if n == "refusesToSet" then return false end
+    if not CV[n] then error("unknown cvar " .. tostring(n)) end
+    CV[n][1] = v; table.insert(SETS, n); return true
+  end,
+  GetCVarInfo = function(n)
+    local e = CV[n]; if not e then return nil end
+    return e[1], e[2], false, false, e[3] or false, false, e[4] or false
+  end,
+}
+C_Console = { GetAllCommands = function()
+  local t = {}
+  for n in pairs(CV) do table.insert(t, { command = n, commandType = 0 }) end
+  table.insert(t, { command = "reloadui", commandType = 1 })      -- a command, not a CVar
+  return t
+end }
+Enum = { ConsoleCommandType = { Cvar = 0, Command = 1 } }
+BARS = { false, true, true, false, false, false, false }
+ALWAYS_SHOW_MULTIBARS = "1"
+BAR_SET_CALLS = {}
+function GetActionBarToggles() return unpack(BARS) end
+function SetActionBarToggles(...) table.insert(BAR_SET_CALLS, { ... }) end
 local chat = {
   { "General", 18, 0,0,0, 1, true, true, 1, false },
   { "Combat Log", 14, 0,0,0, 1, true, true, 2, false },
@@ -116,7 +153,7 @@ function FIRE(event) for _, f in ipairs(CREATED) do if f.scripts.OnEvent and f.r
 """)
 
 lua.execute("NS = {}")
-for fn in ("UISnapshot/Codec.lua", "UISnapshot/UISnapshot.lua", "UISnapshot/EditModeApply.lua", "UISnapshot/Minimap.lua", "UISnapshot/UI.lua"):
+for fn in ("UISnapshot/Codec.lua", "UISnapshot/UISnapshot.lua", "UISnapshot/Minimap.lua", "UISnapshot/UI.lua"):
     src = open(fn).read().replace("local ADDON, ns = ...", "local ADDON, ns = 'UISnapshot', NS")
     lua.execute(src)
 run = lua.eval("function(m) SlashCmdList['UISNAPSHOT'](m) end")
@@ -261,15 +298,15 @@ check("unknown fields dropped", ep and ep.unknownField == nil)
 local newer = NS.codec.encode({ v = 99, name = "x", profile = {} })
 local nn, ne = NS.importString(newer, "", false)
 check("newer export version refused", nn == nil and ne:find("newer") ~= nil)
--- imported CVar names join the tracked list
-local tracked = {}
-for _, c in ipairs(NS.db().cvars) do tracked[c] = true end
-check("imported CVar names are tracked for future saves", tracked.good_name)
+-- importing does not touch the tracked list
+local trackedNow = {}
+for _, c in ipairs(NS.db().cvars) do trackedNow[c] = true end
+check("import does not add CVar names to the tracked list", not trackedNow.good_name and not trackedNow.gxResolution)
 
 -- ===== 0.4.0: settings, reload, report, minimap, Edit Mode apply =====
 local S = NS.db().settings
 check("defaults: auto-reload on", S.autoReload == true)
-check("defaults: Edit Mode apply off", S.applyEditMode == false)
+check("no Edit Mode auto-apply setting exists", S.applyEditMode == nil and NS.applyEditMode == nil)
 check("defaults: minimap button shown", S.minimap.hide == false)
 
 -- a profile to load
@@ -371,168 +408,152 @@ SlashCmdList['UISNAPSHOT']("minimap")
 -- checkboxes in the window
 local win = UISnapshotFrame
 if not win:IsShown() then SlashCmdList['UISNAPSHOT']("") end
-check("window has three setting checkboxes", #win.checks == 3)
-local cbReload, cbEM, cbMini = win.checks[1], win.checks[2], win.checks[3]
-check("checkboxes show saved state", cbReload.checked == true and cbEM.checked == false and cbMini.checked == true)
+check("window has two setting checkboxes", #win.checks == 2)
+local cbReload, cbMini = win.checks[1], win.checks[2]
+check("checkboxes show saved state", cbReload.checked == true and cbMini.checked == true)
 cbReload:SetChecked(false); cbReload.scripts.OnClick(cbReload)
 check("reload checkbox saves", NS.db().settings.autoReload == false)
 cbReload:SetChecked(true); cbReload.scripts.OnClick(cbReload)
-cbEM:SetChecked(true); cbEM.scripts.OnClick(cbEM)
-check("Edit Mode checkbox saves", NS.db().settings.applyEditMode == true)
-cbEM:SetChecked(false); cbEM.scripts.OnClick(cbEM)
 cbMini:SetChecked(false); cbMini.scripts.OnClick(cbMini)
 check("minimap checkbox hides the button", not mb:IsShown())
 SlashCmdList['UISNAPSHOT']("minimap on")
 check("checkbox state follows the command", cbMini.checked == true)
 
--- ===== Edit Mode apply =====
--- Fake API with 2 preset layouts in front of the custom ones for SetActiveLayout numbering
-local PRESETS = 2
-local function lay(name, ty) return { layoutName = name, layoutType = ty, systems = {} } end
-local store, activeName, saves, setActiveCalls, saveShouldFail
-local function resetEM(customLayouts, active)
-  store = customLayouts
-  activeName = active
-  saves, setActiveCalls, saveShouldFail = 0, {}, false
-  C_EditMode = {
-    GetLayouts = function()
-      local idx
-      for i, l in ipairs(store) do if l.layoutName == activeName then idx = i + PRESETS end end
-      local copy = {}
-      for i, l in ipairs(store) do copy[i] = l end
-      return { layouts = copy, activeLayout = idx or 1 }
-    end,
-    SaveLayouts = function(info)
-      if saveShouldFail then error("AllowedWhenUntainted: blocked") end
-      saves = saves + 1; store = info.layouts
-    end,
-    SetActiveLayout = function(i) table.insert(setActiveCalls, i)
-      local custom = i - PRESETS
-      if store[custom] then activeName = store[custom].layoutName end
-    end,
-    ConvertLayoutInfoToString = function(l) return "EXPORT:" .. l.layoutName end,
-    ConvertStringToLayoutInfo = function(s) if s:sub(1, 2) == "OK" then return { systems = {}, from = s } end return nil end,
-  }
-  EditModeManagerFrame = { IsShown = function() return false end,
-    GetActiveLayoutInfo = function() return { layoutName = activeName } end }
-  Constants = nil
+
+-- ===== 0.5.0: game settings (all changed CVars) and action bars =====
+if not UISnapshotFrame:IsShown() then SlashCmdList['UISNAPSHOT']("") end
+local function text() return table.concat(NS.ui.log.lines, "\n") end
+local function resetLog() NS.ui.log.lines = {} end
+local function reset(n) for k in pairs(n) do n[k] = nil end end
+
+-- tracked list is what the user chose on top of "everything changed"
+local tr = NS.db().cvars
+check("tracked list still has the defaults", #tr >= 7)
+
+resetLog()
+NS.commands.save("Settings")
+local P = UISnapshotDB.profiles["Settings"]
+check("captures non-default CVars", P.cvars.autoLootDefault == "1" and P.cvars.nameplateShowEnemies == "1"
+      and P.cvars.alwaysShowActionBars == "1" and P.cvars.cameraDistanceMaxZoomFactor == "2.6" and P.cvars.Sound_MasterVolume == "0.4")
+check("captures uiScale and useUiScale", P.cvars.uiScale == "0.64" and P.cvars.useUiScale == "1")
+check("tracked CVars are included even when at default", P.cvars.chatMouseScroll == "1" and P.cvars.whisperMode == "inline")
+check("untracked default-valued CVars are left out", P.cvars.floatingCombatTextCombatDamage == nil)
+for _, n in ipairs({ "gxWindow", "gxResolution", "gxMaximize", "lastCharacterIndex", "Sound_OutputDriverName", "locale", "textLocale", "accountName", "portal", "realmName" }) do
+  check("never captures machine/session setting " .. n, P.cvars[n] == nil)
 end
-local function profileWith(layouts, active)
-  return { editMode = { layouts = layouts, active = active } }
-end
-local function lines() return table.concat(NS.ui.log.lines, "\n") end
+check("skips locked and read-only CVars", P.cvars.lockedThing == nil and P.cvars.readonlyThing == nil)
+check("console commands are not mistaken for CVars", P.cvars.reloadui == nil)
+check("records how settings were gathered", P.cvarInfo and P.cvarInfo.mode == "all changed from default" and P.cvarInfo.scanned > 10)
+check("captures action bar toggles", P.actionBars and P.actionBars.bars[1] == false and P.actionBars.bars[2] == true
+      and P.actionBars.bars[3] == true and P.actionBars.bars[4] == false and #P.actionBars.bars == 7)
+check("captures always-show value", P.actionBars.alwaysShow == "1")
+check("save message reports the CVar count and action bars", text():find("changed from default", 1, true) ~= nil and text():find("Action Bar 3, 4", 1, true) ~= nil)
 
--- normal case: A,B exist; C,D are new; C was active
-resetEM({ lay("A", 1), lay("B", 2) }, "A")
-UISnapshotDB.editModeBackups = nil
-NS.ui.log.lines = {}
-local rep = NS.applyEditMode(profileWith({
-  { name = "A", str = "OK a", layoutType = 1 }, { name = "B", str = "OK b", layoutType = 2 },
-  { name = "C", str = "OK c", layoutType = 1 }, { name = "D", str = "OK d", layoutType = 2 } }, "C"))
-check("EM: added the two new layouts", #rep.added == 2 and rep.added[1] == "C" and rep.added[2] == "D")
-check("EM: existing layouts skipped, not overwritten", #rep.skipped == 2)
-check("EM: saved exactly once", saves == 1)
-check("EM: store has 4 layouts, originals first and untouched", #store == 4 and store[1].layoutName == "A" and store[2].layoutName == "B")
-check("EM: new layouts got names and types", store[3].layoutName == "C" and store[3].layoutType == 1 and store[4].layoutName == "D" and store[4].layoutType == 2)
-check("EM: backup of the 2 old layouts was made", UISnapshotDB.editModeBackups and #UISnapshotDB.editModeBackups[1].layouts == 2 and UISnapshotDB.editModeBackups[1].layouts[1].str == "EXPORT:A")
-check("EM: activation index includes the preset offset (3 + 2 = 5)", #setActiveCalls == 1 and setActiveCalls[1] == 5)
-check("EM: reports the activated layout", rep.activated == "C")
-
--- already active
-resetEM({ lay("A", 1) }, "A")
-rep = NS.applyEditMode(profileWith({ { name = "A", str = "OK a" } }, "A"))
-check("EM: nothing to add, no save", saves == 0 and #rep.added == 0)
-check("EM: already-active layout is not re-activated", #setActiveCalls == 0 and rep.activateNote and rep.activateNote:find("already") ~= nil)
-
--- string not accepted
-resetEM({ lay("A", 1) }, "A")
-rep = NS.applyEditMode(profileWith({ { name = "X", str = "BAD", layoutType = 1 } }, nil))
-check("EM: unaccepted string reported, nothing saved", #rep.failed == 1 and saves == 0)
-
--- save refused (tainted/blocked)
-resetEM({ lay("A", 1) }, "A")
-saveShouldFail = true
-rep = NS.applyEditMode(profileWith({ { name = "C", str = "OK c", layoutType = 1 } }, "C"))
-check("EM: refused save is reported", rep.error ~= nil and rep.error:find("nothing was changed", 1, true) ~= nil)
-check("EM: refused save adds nothing and does not activate", #rep.added == 0 and #setActiveCalls == 0 and #store == 1)
-check("EM: refusal points to the manual route", rep.error:find("/uisnap editmode", 1, true) ~= nil)
-
--- combat and Edit Mode open
-resetEM({ lay("A", 1) }, "A")
-InCombatLockdown = function() return true end
-UISnapshotDB.editModeBackups = nil
-rep = NS.applyEditMode(profileWith({ { name = "C", str = "OK c" } }, "C"))
-check("EM: refuses in combat, no backup, no save", rep.error ~= nil and saves == 0 and UISnapshotDB.editModeBackups == nil)
-InCombatLockdown = function() return false end
-EditModeManagerFrame.IsShown = function() return true end
-rep = NS.applyEditMode(profileWith({ { name = "C", str = "OK c" } }, "C"))
-check("EM: refuses while Edit Mode is open", rep.error ~= nil and rep.error:find("close Edit Mode", 1, true) ~= nil and saves == 0)
-EditModeManagerFrame.IsShown = function() return false end
-
--- API missing
-resetEM({ lay("A", 1) }, "A")
-C_EditMode.ConvertStringToLayoutInfo = nil
-rep = NS.applyEditMode(profileWith({ { name = "C", str = "OK c" } }, "C"))
-check("EM: missing API is handled", rep.error ~= nil and saves == 0)
-
--- no layouts in the profile
-rep = NS.applyEditMode(profileWith({}, nil))
-check("EM: profile without layouts is handled", rep.error ~= nil)
-
--- cap per type
-resetEM({ lay("A", 1), lay("B", 2) }, "A")
-Constants = { EditModeConsts = { EditModeMaxLayoutsPerType = 1 } }
-rep = NS.applyEditMode(profileWith({ { name = "C", str = "OK c", layoutType = 1 }, { name = "D", str = "OK d", layoutType = 2 } }, nil))
-check("EM: per-type cap respected", #rep.added == 0 and #rep.skipped == 2 and saves == 0)
-Constants = nil
-
--- active layout is a preset: numbering unknown, so do not guess
-resetEM({ lay("A", 1) }, "Modern")
-rep = NS.applyEditMode(profileWith({ { name = "C", str = "OK c", layoutType = 1 } }, "C"))
-check("EM: preset-active numbering is not guessed", #setActiveCalls == 0 and rep.activateNote ~= nil and #rep.added == 1)
-
--- target missing
-resetEM({ lay("A", 1) }, "A")
-rep = NS.applyEditMode(profileWith({ { name = "C", str = "OK c", layoutType = 1 } }, "Zed"))
-check("EM: unknown target layout is reported", #setActiveCalls == 0 and rep.activateNote ~= nil and rep.activateNote:find("Zed", 1, true) ~= nil)
-
--- backups keep only the newest 3
-resetEM({ lay("A", 1) }, "A")
-UISnapshotDB.editModeBackups = nil
-for i = 1, 5 do NS.applyEditMode(profileWith({ { name = "N" .. i, str = "OK" } }, nil)) end
-check("EM: only 3 backups kept, newest first", #UISnapshotDB.editModeBackups == 3)
-NS.commands.backups()
-check("backups command lists them", lines():find("Backup 1", 1, true) ~= nil)
+-- show / cvars / bars commands
+resetLog(); NS.commands.show("Settings")
+check("show reports the settings mode and action bars", text():find("all changed from default", 1, true) ~= nil and text():find("Action Bar 3, 4", 1, true) ~= nil)
 UISnapshotCopyFrame:Hide()
-NS.commands.backup("1")
-check("backup command opens the strings", UISnapshotCopyFrame:IsShown() and UISnapshotCopyFrame.edit:GetText():find("EXPORT:", 1, true) ~= nil)
+NS.commands.cvars("Settings")
+local listing = UISnapshotCopyFrame.edit:GetText()
+check("cvars command lists saved settings", UISnapshotCopyFrame:IsShown() and listing:find("autoLootDefault = 1", 1, true) ~= nil)
+check("cvars listing has no machine-specific settings", listing:find("gxResolution", 1, true) == nil and listing:find("accountName", 1, true) == nil)
+resetLog(); NS.commands.bars()
+check("bars command prints the toggles", text():find("GetActionBarToggles: false, true, true, false", 1, true) ~= nil)
 
--- Load honours the setting
-resetEM({ lay("A", 1) }, "A")
-UISnapshotDB.profiles["EM Test"] = { saved = "x", character = "x", chat = {}, cvars = {}, addons = {},
-  editMode = { layouts = { { name = "Z", str = "OK z", layoutType = 1 } }, active = "Z" } }
-NS.ui.selected = "EM Test"
-NS.db().settings.applyEditMode = false
-NS.commands.load("EM Test")
-check("Load does not touch Edit Mode when the setting is off", saves == 0)
-NS.db().settings.applyEditMode = true
-NS.commands.load("EM Test")
-check("Load applies Edit Mode when the setting is on", saves == 1 and #store == 2)
-NS.db().settings.applyEditMode = false
+-- diff before changing anything: all match
+resetLog(); NS.commands.diff("Settings")
+check("diff: unchanged settings match", text():find("saved settings match", 1, true) ~= nil and text():find("Action bars: match", 1, true) ~= nil)
 
--- the window button asks first
-POPUPS = {}; saves = 0; resetEM({ lay("A", 1) }, "A")
-A.applyEditMode()
-check("Apply Edit Mode button asks for confirmation", #POPUPS == 1)
-ACCEPT_LAST_POPUP()
-check("Apply Edit Mode button applies after confirm", saves == 1)
+-- change things like a fresh install would look
+CV.autoLootDefault[1] = "0"; CV.nameplateShowEnemies[1] = "0"; CV.Sound_MasterVolume[1] = "1"
+CV.uiScale[1] = "1"; CV.useUiScale[1] = "0"; CV.refusesToSet[1] = "6"
+CV.gxResolution[1] = "1920x1080"; CV.locale[1] = "frFR"; CV.accountName[1] = "OTHER"
+BARS = { false, false, false, false, false, false, false }
+resetLog(); NS.commands.diff("Settings")
+check("diff lists changed settings with now/saved", text():find("autoLootDefault: now 0, saved 1", 1, true) ~= nil)
+check("diff reports the changed count", text():find("saved settings differ from now", 1, true) ~= nil)
+check("diff shows the action bar change", text():find("Action bars: now none of bars 2-8, saved Action Bar 3, 4", 1, true) ~= nil)
+check("diff ignores machine-specific settings", text():find("gxResolution", 1, true) == nil)
 
--- layoutType survives export/import and is validated
-local lt = NS.codec.encode({ v = 1, name = "LT", profile = { editMode = { layouts = {
-  { name = "one", str = "s", layoutType = 2 }, { name = "two", str = "s", layoutType = 7 }, { name = "three", str = "s" } } } } })
-local ltn = NS.importString(lt, "", true)
-local ll = UISnapshotDB.profiles[ltn].editMode.layouts
-check("layoutType 2 kept, invalid or missing become 1", ll[1].layoutType == 2 and ll[2].layoutType == 1 and ll[3].layoutType == 1)
+-- load restores them
+reset(SETS); BAR_SET_CALLS = {}
+resetLog(); TIMERS = {}
+NS.commands.load("Settings")
+check("load restored the CVars", CV.autoLootDefault[1] == "1" and CV.nameplateShowEnemies[1] == "1" and CV.Sound_MasterVolume[1] == "0.4")
+check("load restored uiScale", CV.uiScale[1] == "0.64" and CV.useUiScale[1] == "1")
+local posUse, posScale
+for i, n in ipairs(SETS) do if n == "useUiScale" then posUse = i elseif n == "uiScale" then posScale = i end end
+check("useUiScale is set before uiScale", posUse and posScale and posUse < posScale)
+local setList = table.concat(SETS, ",")
+check("settings that already matched are not set again", not setList:find("chatStyle", 1, true) and not setList:find("whisperMode", 1, true))
+check("machine-specific settings were not touched", CV.gxResolution[1] == "1920x1080" and CV.locale[1] == "frFR" and CV.accountName[1] == "OTHER")
+check("action bars were set once, with the saved states", #BAR_SET_CALLS == 1 and BAR_SET_CALLS[1][1] == false and BAR_SET_CALLS[1][2] == true
+      and BAR_SET_CALLS[1][3] == true and BAR_SET_CALLS[1][4] == false)
+check("always-show value is passed along", BAR_SET_CALLS[1][8] == "1")
+check("load says the action bars show after the reload", text():find("Action bars set to: Action Bar 3, 4 (shows after the reload)", 1, true) ~= nil)
+check("load names the CVar that could not be set", text():find("Could not set: refusesToSet", 1, true) ~= nil)
+check("load reports changed/matched/failed counts", text():find("CVars changed", 1, true) ~= nil and text():find("already matched", 1, true) ~= nil and text():find("1 could not be set", 1, true) ~= nil)
+check("load still schedules the reload", #TIMERS >= 1)
+
+-- imported profile cannot set denied CVars
+local hostile = NS.codec.encode({ v = 1, name = "sneaky", profile = { cvars = { gxResolution = "640x480", locale = "xxXX", accountName = "EVIL", autoLootDefault = "0" } } })
+local hn = NS.importString(hostile, "", true)
+CV.autoLootDefault[1] = "1"; CV.gxResolution[1] = "1920x1080"; CV.locale[1] = "frFR"; CV.accountName[1] = "OTHER"
+resetLog(); NS.commands.load(hn)
+check("imported profile can set normal CVars", CV.autoLootDefault[1] == "0")
+check("imported profile cannot set denied CVars", CV.gxResolution[1] == "1920x1080" and CV.locale[1] == "frFR" and CV.accountName[1] == "OTHER")
+
+-- diff caps its output
+local many = {}
+for i = 1, 30 do many["fake" .. i] = tostring(i) end
+local big = NS.importString(NS.codec.encode({ v = 1, name = "many", profile = { cvars = many } }), "", true)
+resetLog(); NS.commands.diff(big)
+check("diff caps long lists", text():find("30 of 30 saved settings differ", 1, true) ~= nil and text():find("...and 5 more.", 1, true) ~= nil)
+
+-- sanitizing the new fields
+local odd = NS.importString(NS.codec.encode({ v = 1, name = "odd", profile = {
+  actionBars = { bars = { 1, "x", true, nil, false }, alwaysShow = { 1 } }, cvarInfo = { mode = string.rep("m", 500), scanned = "many" } } }), "", true)
+local op = UISnapshotDB.profiles[odd]
+check("action bars sanitized to 7 booleans", op.actionBars and #op.actionBars.bars == 7 and op.actionBars.bars[1] == true and op.actionBars.bars[4] == false)
+check("bad always-show value dropped", op.actionBars.alwaysShow == nil)
+check("cvarInfo sanitized", op.cvarInfo.mode == "?" and op.cvarInfo.scanned == 0)
+
+-- export/import keeps the new fields
+NS.ui.selected = "Settings"
+UISnapshotCopyFrame:Hide(); UISnapshotDB.profiles["Settings"].importedOn = nil
+local before = UISnapshotDB.profiles["Settings"]
+NS.commands.export("Settings")
+local ex = UISnapshotCopyFrame.edit:GetText()
+local rt = NS.importString(ex, "Settings copy", true)
+local rp = UISnapshotDB.profiles[rt]; rp.importedOn = nil
+check("export/import keeps CVars, action bars and cvarInfo", DEEPEQ_PROFILE(before.cvars, rp.cvars) and DEEPEQ_PROFILE(before.actionBars, rp.actionBars) and DEEPEQ_PROFILE(before.cvarInfo, rp.cvarInfo))
+
+-- fallbacks when the list-all call is missing
+local savedConsole = C_Console
+C_Console = nil
+resetLog(); NS.commands.save("Tracked only")
+local T = UISnapshotDB.profiles["Tracked only"]
+check("without C_Console only tracked CVars are saved", T.cvarInfo.mode == "tracked list only" and T.cvars.autoLootDefault == nil and T.cvars.chatStyle ~= nil)
+check("fallback says so", text():find("only the", 1, true) ~= nil and text():find("not available here", 1, true) ~= nil)
+C_Console = savedConsole
+local savedInfo = C_CVar.GetCVarInfo
+C_CVar.GetCVarInfo = nil
+NS.commands.save("No info")
+check("without GetCVarInfo only tracked CVars are saved", UISnapshotDB.profiles["No info"].cvarInfo.mode == "tracked list only")
+C_CVar.GetCVarInfo = savedInfo
+
+-- fallbacks when the action bar API is missing
+local g, s2 = GetActionBarToggles, SetActionBarToggles
+GetActionBarToggles = nil
+NS.commands.save("No bars")
+check("no GetActionBarToggles: profile has no action bars, no crash", UISnapshotDB.profiles["No bars"].actionBars == nil)
+GetActionBarToggles = g
+SetActionBarToggles = nil
+resetLog(); NS.commands.load("Settings")
+check("no SetActionBarToggles: says so, still applies CVars", text():find("Could not set the action bars", 1, true) ~= nil)
+SetActionBarToggles = s2
+resetLog(); NS.commands.load("No bars")
+check("profile without action bars loads fine", text():find("Applied 'No bars'", 1, true) ~= nil and text():find("Action bars set", 1, true) == nil)
 
 return table.concat(out, "\n")
 """
