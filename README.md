@@ -24,6 +24,8 @@ Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, a
 
 `load` restored moved chat windows to their saved positions and the custom channels looked right (visual check, 1 Oct 2026).
 
-**Untested in the live client:** `addons`, CVar restore, dock/undock restore, active-layout detection (fixed in 0.1.1), and the resolution-change warning. Tests run only against a simulated client (`python3 tests/mock_test.py`, Lua 5.1).
+`diff` and CVar restore also passed a flip-and-restore test (1 Oct 2026).
+
+**Untested in the live client:** `addons`, dock/undock restore, active-layout detection (fixed in 0.1.1), and the resolution-change warning. Tests run only against a simulated client (`python3 tests/mock_test.py`, Lua 5.1).
 
 Edit Mode layouts are saved as strings but are not applied automatically; paste one into Edit Mode's Import. Profiles live in `WTF/Account/<account>/SavedVariables/UISnapshot.lua` and need to be copied to the new install by hand.
