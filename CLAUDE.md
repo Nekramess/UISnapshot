@@ -14,7 +14,8 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Never commit to `main`: branch, PR, Anthony merges.
 
 ## Confirmed vs untested (update when you learn more)
-- Confirmed in beta 1 Oct 2026 (user screenshot): `C_EditMode`, `C_EditMode.GetLayouts()`, `GetChatWindowInfo(1)` returns 10 values.
-- Untested in the live client: everything else, including `ConvertLayoutInfoToString`, chat restore, CVar restore, `C_AddOns` calls, the copy box.
-- The default tracked CVar list is a guess; names that return nil are skipped.
+- Confirmed in the Forever beta, 1 Oct 2026 (user screenshots/export): `C_EditMode.GetLayouts()` and `ConvertLayoutInfoToString` work (6 custom layouts exported as strings); `GetChatWindowInfo` works (10 windows); all 7 default CVar names returned values; 26 addons listed; `/uisnap save`, `show` and `editmode` ran and the copy box opened and showed the strings.
+- Bug found in 0.1.0: "(was active)" never appeared. `GetLayouts().activeLayout` is probably offset by the preset layouts (unconfirmed). 0.1.1 asks `EditModeManagerFrame:GetActiveLayoutInfo()` instead; that call is untested in the live client.
+- Untested in the live client: `load`, `diff`, `addons`, chat position/dock/channel restore, CVar restore, `GetPhysicalScreenSize` warning.
+- `show` prints UI-unit size (`GetScreenWidth/Height`, 4096x1152 at scale 0.667 in the test) and, from 0.1.1, the physical window size.
 - Launch install path and whether WTF files carry over are unconfirmed.

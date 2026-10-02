@@ -1,4 +1,4 @@
--- UI Snapshot 0.1.0
+-- UI Snapshot 0.1.1
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -126,8 +126,14 @@ local function captureEditMode()
             out.layouts[#out.layouts + 1] = { name = layout.layoutName, str = str }
         end
     end
-    local active = info.layouts and info.layouts[info.activeLayout]
-    if active then out.active = active.layoutName end
+    -- GetLayouts() lists custom layouts only, so activeLayout may be offset by the
+    -- preset layouts. Ask the Edit Mode manager for the active layout by name instead.
+    out.activeIndex = info.activeLayout
+    local mgr = _G.EditModeManagerFrame
+    if mgr and mgr.GetActiveLayoutInfo then
+        local li = try(mgr.GetActiveLayoutInfo, mgr)
+        if type(li) == "table" then out.active = li.layoutName end
+    end
     return out
 end
 
@@ -136,6 +142,7 @@ local function capture(name)
         saved = date("%Y-%m-%d %H:%M"),
         character = (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?"),
         screen = { uiScale = UIParent:GetScale(), width = GetScreenWidth(), height = GetScreenHeight() },
+        physical = try(function() local w, h = GetPhysicalScreenSize(); return { w = w, h = h } end),
         chat = captureChat(),
         cvars = captureCVars(),
         addons = captureAddons(),
@@ -270,6 +277,16 @@ local function need(name)
     return p
 end
 
+local function warnIfResolutionDiffers(p)
+    local saved = p.physical
+    if type(saved) ~= "table" or not saved.w then return end
+    local now = try(function() local w, h = GetPhysicalScreenSize(); return { w = w, h = h } end)
+    if now and (now.w ~= saved.w or now.h ~= saved.h) then
+        say(("Heads up: saved at %dx%d, this client is %dx%d. Positions saved in pixels-from-edge may not line up."):format(
+            saved.w, saved.h, now.w, now.h))
+    end
+end
+
 local commands = {}
 
 function commands.save(name)
@@ -291,14 +308,18 @@ end
 
 function commands.show(name)
     local p = need(name); if not p then return end
-    say(("%s: %d chat windows, %d CVars, %d addons, %d Edit Mode layouts, UI scale %s, screen %dx%d")
+    say(("%s: %d chat windows, %d CVars, %d addons, %d Edit Mode layouts, UI scale %.3f, UI size %dx%d%s")
         :format(name, count(p.chat), count(p.cvars), #p.addons, #p.editMode.layouts,
-            tostring(p.screen and p.screen.uiScale), (p.screen and p.screen.width) or 0,
-            (p.screen and p.screen.height) or 0))
+            (p.screen and p.screen.uiScale) or 0, (p.screen and p.screen.width) or 0,
+            (p.screen and p.screen.height) or 0,
+            (p.physical and p.physical.w) and (", window " .. p.physical.w .. "x" .. p.physical.h) or ""))
+    say("Edit Mode active layout: " .. tostring(p.editMode.active or "not detected")
+        .. " (raw index " .. tostring(p.editMode.activeIndex) .. ")")
 end
 
 function commands.diff(name)
     local p = need(name); if not p then return end
+    warnIfResolutionDiffers(p)
     local missing, extra = addonDiff(p.addons)
     say(("Addons: %d saved but not enabled now, %d enabled now but not in the profile."):format(#missing, #extra))
     if #missing > 0 then say("Not enabled / not installed: " .. table.concat(missing, ", ")) end
@@ -316,6 +337,7 @@ end
 function commands.load(name)
     local p = need(name); if not p then return end
     if InCombatLockdown() then say("Not in combat, please."); return end
+    warnIfResolutionDiffers(p)
     local cOk, cFail = applyCVars(p.cvars)
     local hOk, hFail = applyChat(p.chat)
     say(("Applied '%s': CVars %d ok / %d failed; chat steps %d ok / %d failed."):format(name, cOk, cFail, hOk, hFail))

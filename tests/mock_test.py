@@ -47,6 +47,8 @@ C_AddOns = {
 UnitName = function() return "Nekramess" end
 GetRealmName = function() return "Test" end
 InCombatLockdown = function() return false end
+GetPhysicalScreenSize = function() return 3840, 1080 end
+EditModeManagerFrame = { GetActiveLayoutInfo = function() return { layoutName = "UI" } end }
 UIParent = { GetScale = function() return 0.64 end }
 GetScreenWidth = function() return 5120 end GetScreenHeight = function() return 1440 end
 date = os.date

@@ -20,8 +20,8 @@ Copy the `UISnapshot` folder into `World of Warcraft/_classic_beta_/Interface/Ad
 
 ## Status
 
-Confirmed in the Forever beta (screenshot, 1 Oct 2026): `C_EditMode` and `C_EditMode.GetLayouts()` exist, and `GetChatWindowInfo(1)` returns 10 values.
+Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, addon list, Edit Mode layouts as strings), `/uisnap show` works, and the copy box displays the layout strings.
 
-Everything else is **untested in the live client**: chat position/dock/channel restore, CVar restore, addon enabling, the copy box. Tests run only against a simulated client (`python3 tests/mock_test.py`, Lua 5.1).
+**Untested in the live client:** `load`, `diff`, `addons`, chat position/dock/channel restore, CVar restore, active-layout detection (fixed in 0.1.1), and the resolution-change warning. Tests run only against a simulated client (`python3 tests/mock_test.py`, Lua 5.1).
 
-Edit Mode layouts are saved as strings but are not applied automatically; paste them into Edit Mode's Import. Profiles live in `WTF/Account/<account>/SavedVariables/UISnapshot.lua` and need to be copied to the new install by hand.
+Edit Mode layouts are saved as strings but are not applied automatically; paste one into Edit Mode's Import. Profiles live in `WTF/Account/<account>/SavedVariables/UISnapshot.lua` and need to be copied to the new install by hand.
