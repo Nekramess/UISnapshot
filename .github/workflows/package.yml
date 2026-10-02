@@ -1,0 +1,15 @@
+name: Package
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./tools/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UISnapshot-forever
+          path: UISnapshot-v*-forever.zip
