@@ -97,7 +97,7 @@ CREATED = created
 """)
 
 lua.execute("NS = {}")
-for fn in ("UISnapshot/UISnapshot.lua", "UISnapshot/UI.lua"):
+for fn in ("UISnapshot/Codec.lua", "UISnapshot/UISnapshot.lua", "UISnapshot/UI.lua"):
     src = open(fn).read().replace("local ADDON, ns = ...", "local ADDON, ns = 'UISnapshot', NS")
     lua.execute(src)
 run = lua.eval("function(m) SlashCmdList['UISNAPSHOT'](m) end")
@@ -156,8 +156,108 @@ check("/uisnap ui toggles window closed", not f:IsShown())
 local p0 = #PRINTED
 SlashCmdList['UISNAPSHOT']("list")
 check("typed command prints to chat when window closed", #PRINTED > p0)
+
+-- ===== export / import through the window =====
+local f2 = UISnapshotFrame
+SlashCmdList['UISNAPSHOT']("")                        -- open again (was toggled closed above)
+f2.nameBox:SetText("Round Trip"); A.save()
+local original = UISnapshotDB.profiles["Round Trip"]
+NS.ui.selected = "Round Trip"
+A.export()
+local exported = UISnapshotCopyFrame and UISnapshotCopyFrame.edit and UISnapshotCopyFrame.edit:GetText()
+check("export opened the copy box with text", type(exported) == "string" and exported:sub(1, 8) == "UISNAP1:")
+check("export contains the profile name", exported and exported:find("Round Trip", 1, true) ~= nil)
+
+-- wipe everything, then import into a "fresh install"
+UISnapshotDB = {}
+NS.ui.selected = nil
+A.import()
+local imp = UISnapshotImportFrame
+check("import box opened", imp and imp:IsShown())
+imp.edit:SetText(exported); imp.nameBox:SetText("")
+POPUPS = {}
+-- press the import box's own Import button (the last "Import" button created)
+local importBtn
+for _, fr in ipairs(CREATED) do
+  if fr.kind == "Button" and fr.text == "Import" then importBtn = fr end
+end
+check("import box has its own Import button", importBtn ~= nil and importBtn.scripts.OnClick ~= nil)
+importBtn.scripts.OnClick(importBtn)
+local back = UISnapshotDB.profiles and UISnapshotDB.profiles["Round Trip"]
+check("button imported the profile", back ~= nil)
+check("box closed after import", not imp:IsShown())
+check("imported profile is selected in the window", NS.ui.selected == "Round Trip")
+back.importedOn = nil
+check("imported profile equals the original", DEEPEQ_PROFILE(original, back))
+check("box cleared after import", imp.edit:GetText() == "")
+-- pressing Import with an empty box reports an error, no crash
+local n0 = #NS.ui.log.lines
+importBtn.scripts.OnClick(importBtn)
+check("empty box reports in the log", #NS.ui.log.lines > n0)
+-- pressing Import on an existing name asks before replacing
+imp:Show(); imp.edit:SetText(exported)
+POPUPS = {}
+importBtn.scripts.OnClick(importBtn)
+check("existing name triggers a replace confirmation", #POPUPS == 1)
+ACCEPT_LAST_POPUP()
+check("replace confirmed imports again", UISnapshotDB.profiles["Round Trip"] ~= nil and not imp:IsShown())
+
+-- importing the same name again asks first
+local r1, r2, r3 = NS.importString(exported, "", false)
+check("existing name is not overwritten silently", r1 == false and r2 == "exists" and r3 == "Round Trip")
+check("force replaces it", NS.importString(exported, "", true) == "Round Trip")
+check("save-as renames", NS.importString(exported, "Other Name", false) == "Other Name" and UISnapshotDB.profiles["Other Name"] ~= nil)
+
+-- bad input
+local n1, e1 = NS.importString("garbage", "", false)
+check("garbage import fails with a message", n1 == nil and type(e1) == "string")
+local n2, e2 = NS.importString(exported:sub(1, #exported - 10), "", false)
+check("truncated import fails with a message", n2 == nil and e2:find("cut off") ~= nil)
+local n3, e3 = NS.importString("", "", false)
+check("empty import fails with a message", n3 == nil and type(e3) == "string")
+
+-- hostile profile: valid wrapper, bad contents
+local evil = NS.codec.encode({ v = 1, name = "evil\nname\1", profile = {
+  saved = string.rep("x", 5000),
+  chat = { [1] = { name = "ok", fontSize = "huge", groups = { "SAY", 5, {}, string.rep("g", 500) } }, [2] = "notatable", [99] = { name = "far" } },
+  cvars = { ["good_name"] = "1", ["bad name;rm"] = "1", ["x"] = { 1 }, ["long"] = string.rep("v", 500), ["num"] = 5 },
+  addons = { "A", 5, string.rep("a", 500) },
+  editMode = { layouts = { { name = "L", str = "abc" }, { name = 5, str = "x" }, "junk" } },
+  unknownField = "should vanish", __index = "x",
+}})
+local en = NS.importString(evil, "", false)
+local ep = en and UISnapshotDB.profiles[en]
+check("hostile import is accepted but cleaned", ep ~= nil)
+check("control characters stripped from name", en == "evilname")
+check("long saved text rejected", ep and ep.saved == "?")
+check("bad font size replaced with default", ep and ep.chat[1] and ep.chat[1].fontSize == 14)
+check("only valid chat groups kept", ep and #ep.chat[1].groups == 1 and ep.chat[1].groups[1] == "SAY")
+check("non-table and out-of-range chat entries dropped", ep and ep.chat[2] == nil and ep.chat[99] == nil)
+check("only safe CVars kept", ep and ep.cvars.good_name == "1" and ep.cvars.num == "5"
+      and ep.cvars["bad name;rm"] == nil and ep.cvars.x == nil and ep.cvars.long == nil)
+check("only valid addons kept", ep and #ep.addons == 1)
+check("only valid layouts kept", ep and #ep.editMode.layouts == 1)
+check("unknown fields dropped", ep and ep.unknownField == nil)
+-- newer export version refused
+local newer = NS.codec.encode({ v = 99, name = "x", profile = {} })
+local nn, ne = NS.importString(newer, "", false)
+check("newer export version refused", nn == nil and ne:find("newer") ~= nil)
+-- imported CVar names join the tracked list
+local tracked = {}
+for _, c in ipairs(NS.db().cvars) do tracked[c] = true end
+check("imported CVar names are tracked for future saves", tracked.good_name)
+
 return table.concat(out, "\n")
 """
+lua.execute("""
+function DEEPEQ_PROFILE(a, b)
+  if type(a) ~= type(b) then return false end
+  if type(a) ~= "table" then return a == b end
+  for k, v in pairs(a) do if not DEEPEQ_PROFILE(v, b[k]) then return false end end
+  for k in pairs(b) do if a[k] == nil then return false end end
+  return true
+end
+""")
 lua.execute("PRINTED = {}")
 lua.globals().print = lambda *a: (printed.append(" ".join(str(x) for x in a)), lua.execute("table.insert(PRINTED, 1)"))
 try:

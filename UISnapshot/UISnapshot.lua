@@ -1,4 +1,4 @@
--- UI Snapshot 0.2.0
+-- UI Snapshot 0.3.0
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -278,6 +278,128 @@ local function showCopyBox(title, text)
     copyFrame.edit:HighlightText()
 end
 
+ns.showCopyBox = showCopyBox
+
+---------------------------------------------------------------------------
+-- Export / import
+---------------------------------------------------------------------------
+
+local EXPORT_VERSION = 1
+
+local function trim(s) return (tostring(s or "")):match("^%s*(.-)%s*$") end
+
+local function str(v, max)
+    if type(v) == "string" and #v <= (max or 200) then return v end
+end
+local function num(v)
+    if type(v) == "number" and v == v and v > -1e9 and v < 1e9 then return v end
+end
+local function strList(t, maxItems, maxLen)
+    local out = {}
+    if type(t) == "table" then
+        for i = 1, math.min(#t, maxItems) do
+            local x = str(t[i], maxLen)
+            if x then out[#out + 1] = x end
+        end
+    end
+    return out
+end
+
+-- Copies only the fields we know, with type and size checks. Imported data is
+-- never trusted as-is. Returns a clean profile, or nil plus a reason.
+local function sanitizeProfile(p)
+    if type(p) ~= "table" then return nil, "The export has no profile in it." end
+    local out = {
+        saved = str(p.saved, 40) or "?",
+        character = str(p.character, 80) or "?",
+        chat = {}, cvars = {}, editMode = { layouts = {} },
+    }
+    if type(p.screen) == "table" then
+        out.screen = { uiScale = num(p.screen.uiScale), width = num(p.screen.width), height = num(p.screen.height) }
+    end
+    if type(p.physical) == "table" and num(p.physical.w) and num(p.physical.h) then
+        out.physical = { w = p.physical.w, h = p.physical.h }
+    end
+    if type(p.chat) == "table" then
+        for i = 1, 50 do
+            local w = p.chat[i]
+            if type(w) == "table" and str(w.name, 64) then
+                out.chat[i] = {
+                    name = w.name, fontSize = num(w.fontSize) or 14,
+                    r = num(w.r) or 0, g = num(w.g) or 0, b = num(w.b) or 0, alpha = num(w.alpha) or 1,
+                    shown = w.shown and true or false, locked = w.locked and true or false,
+                    uninteractable = w.uninteractable and true or false,
+                    docked = num(w.docked),
+                    width = num(w.width), height = num(w.height), x = num(w.x), y = num(w.y),
+                    point = str(w.point, 20), relPoint = str(w.relPoint, 20),
+                    groups = strList(w.groups, 100, 40), channels = strList(w.channels, 50, 100),
+                }
+            end
+        end
+    end
+    if type(p.cvars) == "table" then
+        local n = 0
+        for k, v in pairs(p.cvars) do
+            local value = (type(v) == "string" or type(v) == "number" or type(v) == "boolean") and tostring(v)
+            if type(k) == "string" and #k <= 64 and k:match("^[%w_]+$") and value and #value <= 200 and n < 200 then
+                out.cvars[k] = value
+                n = n + 1
+            end
+        end
+    end
+    out.addons = strList(p.addons, 500, 100)
+    if type(p.editMode) == "table" then
+        out.editMode.active = str(p.editMode.active, 100)
+        out.editMode.activeIndex = num(p.editMode.activeIndex)
+        out.editMode.error = str(p.editMode.error, 200)
+        if type(p.editMode.layouts) == "table" then
+            for i = 1, math.min(#p.editMode.layouts, 30) do
+                local l = p.editMode.layouts[i]
+                if type(l) == "table" and str(l.str, 60000) and str(l.name, 100) then
+                    out.editMode.layouts[#out.editMode.layouts + 1] = { name = l.name, str = l.str }
+                end
+            end
+        end
+    end
+    return out
+end
+
+-- Returns the profile name on success; nil plus a message on failure; or
+-- false, "exists", name when a profile with that name exists and force is not set.
+function ns.importString(text, saveAs, force)
+    local data, err = ns.codec.decode(text)
+    if not data then return nil, err end
+    if type(data.v) ~= "number" or data.v > EXPORT_VERSION then
+        return nil, "This export was made by a newer version of UI Snapshot. Update the addon and try again."
+    end
+    local clean, why = sanitizeProfile(data.profile)
+    if not clean then return nil, why end
+    local name = trim(saveAs)
+    if name == "" then name = trim(data.name) end
+    name = name:gsub("[%c]", "")
+    if name == "" then name = "imported" end
+    if #name > 64 then name = name:sub(1, 64) end
+    if db().profiles[name] and not force then return false, "exists", name end
+    clean.importedOn = date("%Y-%m-%d %H:%M")
+    db().profiles[name] = clean
+    -- Keep imported CVar names tracked so future saves include them.
+    local tracked = {}
+    for _, c in ipairs(db().cvars) do tracked[c] = true end
+    for c in pairs(clean.cvars) do
+        if not tracked[c] then db().cvars[#db().cvars + 1] = c end
+    end
+    local names = {}
+    for c in pairs(clean.cvars) do names[#names + 1] = c end
+    table.sort(names)
+    say(("Imported '%s': %d chat windows, %d CVars, %d addons, %d Edit Mode layouts."):format(
+        name, count(clean.chat), #names, #clean.addons, #clean.editMode.layouts))
+    if #names > 0 then
+        say("Load will set these CVars: " .. table.concat(names, ", ") .. ". Check them with Details or Diff first if the export came from someone else.")
+    end
+    if ns.refresh then ns.refresh() end
+    return name
+end
+
 ---------------------------------------------------------------------------
 -- Slash commands
 ---------------------------------------------------------------------------
@@ -412,8 +534,21 @@ function commands.cvar(arg)
     end
 end
 
+function commands.export(name)
+    local p = need(name); if not p then return end
+    local ok, text = pcall(ns.codec.encode, { v = EXPORT_VERSION, name = name, profile = p })
+    if not ok then say("Export failed: " .. tostring(text)); return end
+    showCopyBox("Export of '" .. name .. "': Ctrl+C to copy", text)
+    say(("Export of '%s' is %d characters. Copy the whole box into a text file for safekeeping."):format(name, #text))
+end
+
+function commands.import()
+    if ns.openImport then ns.openImport()
+    else say("Open /uisnap and press Import (the import box needs the window).") end
+end
+
 function commands.help()
-    say("/uisnap opens the window. Commands: save|load|show|diff|delete <name>, list, addons <name>, editmode <name>, cvar [add|remove <name>]")
+    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export <name>, list, import, addons <name>, editmode <name>, cvar [add|remove <name>]")
 end
 
 SLASH_UISNAPSHOT1 = "/uisnap"

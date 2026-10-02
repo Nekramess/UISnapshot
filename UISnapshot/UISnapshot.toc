@@ -2,8 +2,9 @@
 ## Title: UI Snapshot
 ## Notes: Save your chat windows, CVars, Edit Mode layouts and addon list, then restore them on a fresh install.
 ## Author: Nekramess
-## Version: 0.2.0
+## Version: 0.3.0
 ## SavedVariables: UISnapshotDB
 
+Codec.lua
 UISnapshot.lua
 UI.lua

@@ -116,6 +116,7 @@ function actions.diff() local n = selected(); if n then commands.diff(n) end end
 function actions.show() local n = selected(); if n then commands.show(n) end end
 function actions.addons() local n = selected(); if n then commands.addons(n) end end
 function actions.editmode() local n = selected(); if n then commands.editmode(n) end end
+function actions.export() local n = selected(); if n then commands.export(n) end end
 
 function actions.delete()
     local n = selected(); if not n then return end
@@ -134,6 +135,101 @@ end
 function actions.cvarAdd() local v = cvarName(); if v then commands.cvar("add " .. v) end end
 function actions.cvarRemove() local v = cvarName(); if v then commands.cvar("remove " .. v) end end
 function actions.cvarList() commands.cvar("") end
+
+---------------------------------------------------------------------------
+-- Import box
+---------------------------------------------------------------------------
+
+local importFrame
+
+local function runImport(force)
+    local text = importFrame.edit:GetText()
+    local saveAs = trim(importFrame.nameBox:GetText())
+    local name, why, existing = ns.importString(text, saveAs, force)
+    if name then
+        importFrame:Hide()
+        importFrame.edit:SetText("")
+        importFrame.nameBox:SetText("")
+        choose(name)
+    elseif name == false then
+        confirm("A profile named '" .. tostring(existing) .. "' already exists. Replace it with the imported one?",
+            function() runImport(true) end)
+    else
+        say("Import failed: " .. tostring(why))
+    end
+end
+
+local function buildImport()
+    local f = CreateFrame("Frame", "UISnapshotImportFrame", UIParent, "BasicFrameTemplateWithInset")
+    f:SetSize(560, 330)
+    f:SetPoint("CENTER", 0, 40)
+    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:SetClampedToScreen(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    tinsert(UISpecialFrames, "UISnapshotImportFrame")
+
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", 0, -6)
+    title:SetText("Import a profile")
+
+    local help = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    help:SetPoint("TOPLEFT", 14, -30)
+    help:SetWidth(530)
+    help:SetJustifyH("LEFT")
+    help:SetText("Click in the box, paste an export (Ctrl+V), then press Import. Only import exports you made or trust: loading the profile will set the CVars it lists.")
+
+    local bg = f:CreateTexture(nil, "ARTWORK")
+    bg:SetPoint("TOPLEFT", 14, -62)
+    bg:SetPoint("BOTTOMRIGHT", -34, 62)
+    bg:SetColorTexture(0, 0, 0, 0.45)
+    local sf = CreateFrame("ScrollFrame", "UISnapshotImportScroll", f, "UIPanelScrollFrameTemplate")
+    sf:SetPoint("TOPLEFT", 18, -66)
+    sf:SetPoint("BOTTOMRIGHT", -38, 66)
+    local eb = CreateFrame("EditBox", nil, sf)
+    eb:SetMultiLine(true)
+    eb:SetFontObject(ChatFontNormal)
+    eb:SetWidth(490)
+    eb:SetAutoFocus(false)
+    eb:SetMaxLetters(0)
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    sf:SetScrollChild(eb)
+    f.edit = eb
+
+    local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetPoint("BOTTOMLEFT", 16, 38)
+    lbl:SetText("Save as (optional, blank keeps the exported name)")
+    local nb = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+    nb:SetSize(220, 22)
+    nb:SetPoint("BOTTOMLEFT", 22, 12)
+    nb:SetAutoFocus(false)
+    nb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    f.nameBox = nb
+
+    local go = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    go:SetSize(110, 24)
+    go:SetPoint("BOTTOMRIGHT", -130, 10)
+    go:SetText("Import")
+    go:SetScript("OnClick", function() runImport(false) end)
+    local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    cancel:SetSize(110, 24)
+    cancel:SetPoint("BOTTOMRIGHT", -14, 10)
+    cancel:SetText(CANCEL)
+    cancel:SetScript("OnClick", function() f:Hide() end)
+
+    importFrame = f
+    return f
+end
+
+function ns.openImport()
+    if not importFrame then buildImport() end
+    importFrame:Show()
+    importFrame.edit:SetFocus()
+end
+actions.import = ns.openImport
 
 ---------------------------------------------------------------------------
 -- Window
@@ -206,7 +302,9 @@ local function build()
     button(f, "Details", 400, -112, 126, actions.show)
     button(f, "Enable addons", 268, -142, 126, actions.addons)
     button(f, "Edit Mode strings", 400, -142, 126, actions.editmode)
-    button(f, "Delete", 268, -172, 126, actions.delete)
+    button(f, "Export", 268, -172, 126, actions.export)
+    button(f, "Import", 400, -172, 126, actions.import)
+    button(f, "Delete", 268, -202, 126, actions.delete)
 
     -- Tracked CVars
     label(f, "Tracked CVars (saved and restored with each profile)", 14, -236)
