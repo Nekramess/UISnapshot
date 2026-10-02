@@ -1,4 +1,4 @@
--- UI Snapshot 0.3.0
+-- UI Snapshot 0.4.0
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -20,8 +20,10 @@ local DEFAULT_CVARS = {
 }
 
 -- Messages go to the window's log while it is open, otherwise to chat.
+local captured   -- while a Load/Import runs, its messages are also kept here
 local function say(msg)
     local text = "|cff33ccffUI Snapshot:|r " .. tostring(msg)
+    if captured then captured[#captured + 1] = text end
     if ui.frame and ui.frame:IsShown() and ui.log then
         ui.log:AddMessage(text)
     else
@@ -29,12 +31,18 @@ local function say(msg)
     end
 end
 ns.say = say
+function ns.beginCapture() captured = {} end
+function ns.endCapture() local c = captured or {}; captured = nil; return c end
 
 local function db()
     local d = UISnapshotDB
     d.version = d.version or DB_VERSION
     d.profiles = d.profiles or {}
     d.cvars = d.cvars or {}
+    d.settings = d.settings or {}
+    if d.settings.autoReload == nil then d.settings.autoReload = true end
+    if d.settings.applyEditMode == nil then d.settings.applyEditMode = false end
+    d.settings.minimap = d.settings.minimap or { hide = false, angle = 215 }
     if #d.cvars == 0 then
         for _, name in ipairs(DEFAULT_CVARS) do d.cvars[#d.cvars + 1] = name end
     end
@@ -134,7 +142,7 @@ local function captureEditMode()
     for _, layout in ipairs(info.layouts or {}) do
         local str = try(C_EditMode.ConvertLayoutInfoToString, layout)
         if str then
-            out.layouts[#out.layouts + 1] = { name = layout.layoutName, str = str }
+            out.layouts[#out.layouts + 1] = { name = layout.layoutName, str = str, layoutType = layout.layoutType }
         end
     end
     -- GetLayouts() lists custom layouts only, so activeLayout may be offset by the
@@ -356,7 +364,7 @@ local function sanitizeProfile(p)
             for i = 1, math.min(#p.editMode.layouts, 30) do
                 local l = p.editMode.layouts[i]
                 if type(l) == "table" and str(l.str, 60000) and str(l.name, 100) then
-                    out.editMode.layouts[#out.editMode.layouts + 1] = { name = l.name, str = l.str }
+                    out.editMode.layouts[#out.editMode.layouts + 1] = { name = l.name, str = l.str, layoutType = (l.layoutType == 2) and 2 or 1 }
                 end
             end
         end
@@ -420,6 +428,47 @@ local function warnIfResolutionDiffers(p)
     end
 end
 
+---------------------------------------------------------------------------
+-- Reload after a change, and show the report once the game is back
+---------------------------------------------------------------------------
+
+local RELOAD_DELAY = 1.5
+
+-- Called after Load, Enable addons and Import. If auto-reload is on, stores the
+-- messages so they can be shown after the reload, then reloads shortly.
+function ns.afterChange(lines)
+    lines = lines or {}
+    if db().settings.autoReload then
+        db().pendingReport = { when = date("%Y-%m-%d %H:%M"), lines = lines }
+        say(("Reloading the UI in %.1f seconds (turn this off in the window if you prefer to /reload yourself)."):format(RELOAD_DELAY))
+        local function go()
+            local ok = pcall(ReloadUI)
+            if not ok then say("Could not reload automatically; type /reload.") end
+        end
+        if C_Timer and C_Timer.After then C_Timer.After(RELOAD_DELAY, go) else go() end
+    else
+        say("Type /reload to finish; some changes need a reload or relog.")
+    end
+end
+
+local function showPendingReport()
+    local r = db().pendingReport
+    if not r then return end
+    db().pendingReport = nil
+    local function show()
+        print("|cff33ccffUI Snapshot:|r finished before the reload (" .. tostring(r.when) .. "):")
+        for _, line in ipairs(r.lines or {}) do print(line) end
+    end
+    if C_Timer and C_Timer.After then C_Timer.After(3, show) else show() end
+end
+
+local events = CreateFrame("Frame")
+events:RegisterEvent("PLAYER_LOGIN")
+events:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_LOGIN" then showPendingReport() end
+end)
+ns.showPendingReport = showPendingReport   -- exposed for the mock test
+
 local commands = {}
 
 function commands.save(name)
@@ -471,6 +520,7 @@ end
 function commands.load(name)
     local p = need(name); if not p then return end
     if InCombatLockdown() then say("Not in combat, please."); return end
+    ns.beginCapture()
     warnIfResolutionDiffers(p)
     local cOk, cFail = applyCVars(p.cvars)
     local hOk, hFail = applyChat(p.chat)
@@ -480,10 +530,14 @@ function commands.load(name)
         say(#missing .. " saved addons are not enabled; /uisnap diff " .. name .. " lists them.")
     end
     if #p.editMode.layouts > 0 then
-        say("Edit Mode layouts are not applied automatically: /uisnap editmode " .. name
-            .. ", then paste into Edit Mode > Layout > Import.")
+        if db().settings.applyEditMode and ns.applyEditMode then
+            ns.applyEditMode(p)
+        else
+            say("Edit Mode layouts were not applied: /uisnap editmode " .. name
+                .. " has the strings to paste into Edit Mode > Layout > Import, or turn on \"Apply Edit Mode layouts on Load\".")
+        end
     end
-    say("Reload (/reload) to finish; some CVars need a reload or relog.")
+    ns.afterChange(ns.endCapture())
 end
 
 function commands.addons(name)
@@ -495,7 +549,9 @@ function commands.addons(name)
     for _, a in ipairs(missing) do
         if pcall(enable, a, UnitName("player")) then n = n + 1 end
     end
-    say(("Enabled %d addon(s); /reload to apply. Addons that are not installed stay missing."):format(n))
+    ns.beginCapture()
+    say(("Enabled %d addon(s). Addons that are not installed stay missing."):format(n))
+    ns.afterChange(ns.endCapture())
 end
 
 function commands.editmode(name)

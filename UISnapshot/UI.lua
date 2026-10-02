@@ -117,6 +117,11 @@ function actions.show() local n = selected(); if n then commands.show(n) end end
 function actions.addons() local n = selected(); if n then commands.addons(n) end end
 function actions.editmode() local n = selected(); if n then commands.editmode(n) end end
 function actions.export() local n = selected(); if n then commands.export(n) end end
+function actions.applyEditMode()
+    local n = selected(); if not n then return end
+    confirm("Add the Edit Mode layouts saved in '" .. n .. "' to your game? Existing layouts are never overwritten, and a backup of your current layouts is made first. The UI reloads afterward.",
+        function() commands.applyeditmode(n) end)
+end
 
 function actions.delete()
     local n = selected(); if not n then return end
@@ -145,12 +150,15 @@ local importFrame
 local function runImport(force)
     local text = importFrame.edit:GetText()
     local saveAs = trim(importFrame.nameBox:GetText())
+    ns.beginCapture()
     local name, why, existing = ns.importString(text, saveAs, force)
+    local lines = ns.endCapture()
     if name then
         importFrame:Hide()
         importFrame.edit:SetText("")
         importFrame.nameBox:SetText("")
         choose(name)
+        ns.afterChange(lines)
     elseif name == false then
         confirm("A profile named '" .. tostring(existing) .. "' already exists. Replace it with the imported one?",
             function() runImport(true) end)
@@ -253,7 +261,7 @@ end
 
 local function build()
     local f = CreateFrame("Frame", "UISnapshotFrame", UIParent, "BasicFrameTemplateWithInset")
-    f:SetSize(560, 440)
+    f:SetSize(560, 480)
     f:SetPoint("CENTER")
     f:SetFrameStrata("HIGH")
     f:SetMovable(true)
@@ -305,6 +313,7 @@ local function build()
     button(f, "Export", 268, -172, 126, actions.export)
     button(f, "Import", 400, -172, 126, actions.import)
     button(f, "Delete", 268, -202, 126, actions.delete)
+    button(f, "Apply Edit Mode", 400, -202, 126, actions.applyEditMode)
 
     -- Tracked CVars
     label(f, "Tracked CVars (saved and restored with each profile)", 14, -236)
@@ -318,14 +327,43 @@ local function build()
     button(f, "Untrack", 296, -253, 80, actions.cvarRemove)
     button(f, "List", 382, -253, 80, actions.cvarList)
 
+    -- Settings
+    f.checks = {}
+    local function checkbox(y, text, get, set)
+        local cb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+        cb:SetSize(24, 24)
+        cb:SetPoint("TOPLEFT", 12, y)
+        local fs = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        fs:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        fs:SetText(text)
+        cb:SetScript("OnClick", function(self) set(self:GetChecked() and true or false) end)
+        cb.get = get
+        f.checks[#f.checks + 1] = cb
+        return cb
+    end
+    local settings = function() return ns.db().settings end
+    checkbox(-282, "Reload the UI after Load, Enable addons and Import",
+        function() return settings().autoReload end,
+        function(v) settings().autoReload = v end)
+    checkbox(-304, "Apply Edit Mode layouts on Load (experimental, see README)",
+        function() return settings().applyEditMode end,
+        function(v) settings().applyEditMode = v end)
+    checkbox(-326, "Show the minimap button",
+        function() return ns.minimap.isShown() end,
+        function(v) ns.minimap.setShown(v) end)
+    function ns.refreshSettings()
+        for _, cb in ipairs(f.checks) do cb:SetChecked(cb.get() and true or false) end
+    end
+    ns.refreshSettings()
+
     -- Output log
-    label(f, "Output", 14, -286)
+    label(f, "Output", 14, -358)
     local lbg = f:CreateTexture(nil, "ARTWORK")
-    lbg:SetPoint("TOPLEFT", 14, -302)
+    lbg:SetPoint("TOPLEFT", 14, -374)
     lbg:SetPoint("BOTTOMRIGHT", -14, 14)
     lbg:SetColorTexture(0, 0, 0, 0.45)
     local log = CreateFrame("ScrollingMessageFrame", nil, f)
-    log:SetPoint("TOPLEFT", 20, -306)
+    log:SetPoint("TOPLEFT", 20, -378)
     log:SetPoint("BOTTOMRIGHT", -20, 18)
     log:SetFontObject(ChatFontNormal)
     log:SetJustifyH("LEFT")
@@ -350,6 +388,7 @@ function ns.toggleUI()
     else
         frame:Show()
         ns.refresh()
+        if ns.refreshSettings then ns.refreshSettings() end
     end
 end
 
