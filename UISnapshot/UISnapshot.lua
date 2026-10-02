@@ -1,4 +1,4 @@
--- UI Snapshot 0.1.1
+-- UI Snapshot 0.2.0
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -10,6 +10,8 @@
 
 local ADDON, ns = ...
 UISnapshotDB = UISnapshotDB or {}
+local ui = {}   -- window state, filled in by UI.lua
+ns.ui = ui
 
 local DB_VERSION = 1
 local DEFAULT_CVARS = {
@@ -17,9 +19,16 @@ local DEFAULT_CVARS = {
     "whisperMode", "chatMouseScroll", "showTutorials",
 }
 
+-- Messages go to the window's log while it is open, otherwise to chat.
 local function say(msg)
-    print("|cff33ccffUI Snapshot:|r " .. tostring(msg))
+    local text = "|cff33ccffUI Snapshot:|r " .. tostring(msg)
+    if ui.frame and ui.frame:IsShown() and ui.log then
+        ui.log:AddMessage(text)
+    else
+        print(text)
+    end
 end
+ns.say = say
 
 local function db()
     local d = UISnapshotDB
@@ -31,6 +40,8 @@ local function db()
     end
     return d
 end
+
+ns.db = db
 
 local function count(t)
     local n = 0
@@ -295,6 +306,7 @@ function commands.save(name)
     say(("Saved '%s': %d chat windows, %d CVars, %d addons, %d Edit Mode layouts.")
         :format(name, count(p.chat), count(p.cvars), #p.addons, #p.editMode.layouts))
     if p.editMode.error then say("Edit Mode: " .. p.editMode.error) end
+    if ns.refresh then ns.refresh() end
 end
 
 function commands.list()
@@ -377,7 +389,11 @@ function commands.editmode(name)
 end
 
 function commands.delete(name)
-    if need(name) then db().profiles[name] = nil; say("Deleted '" .. name .. "'.") end
+    if need(name) then
+        db().profiles[name] = nil
+        say("Deleted '" .. name .. "'.")
+        if ns.refresh then ns.refresh() end
+    end
 end
 
 function commands.cvar(arg)
@@ -397,13 +413,17 @@ function commands.cvar(arg)
 end
 
 function commands.help()
-    say("/uisnap save|load|show|diff|delete <name>, list, addons <name>, editmode <name>, cvar [add|remove <name>]")
+    say("/uisnap opens the window. Commands: save|load|show|diff|delete <name>, list, addons <name>, editmode <name>, cvar [add|remove <name>]")
 end
 
 SLASH_UISNAPSHOT1 = "/uisnap"
 SlashCmdList["UISNAPSHOT"] = function(msg)
     local cmd, rest = (msg or ""):match("^(%S*)%s*(.-)%s*$")
-    local fn = commands[cmd ~= "" and cmd or "help"]
+    if cmd == "" or cmd == "ui" then
+        if ns.toggleUI then ns.toggleUI() else commands.help() end
+        return
+    end
+    local fn = commands[cmd]
     if fn then fn(rest) else commands.help() end
 end
 
