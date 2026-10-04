@@ -49,7 +49,7 @@ Profiles live in your WTF folder, which a fresh install does not have, so use te
 **Export (old install)**
 1. Open `/uisnap`, select the profile, press **Export**.
 2. Press Ctrl+C in the box that opens (click in it first if the text is not highlighted).
-3. Paste it into a text file and keep it (about 20,000 characters for a full UI).
+3. Paste it into a text file and keep it (tens of thousands of characters for a full UI, so use a text file, not a chat message).
 
 **Import (new install)**
 1. Open `/uisnap` and press **Import**.
@@ -63,6 +63,7 @@ A cut-off or altered export is rejected with a message instead of half-importing
 ### Safety
 - Imports are read as data only; pasted text is never run as code.
 - Every imported field is type- and size-checked.
+- Key bindings can only be set on commands the game lists; an import cannot bind a key to a macro or script.
 - Settings tied to your computer (graphics device, resolution, sound output, locale, account and realm) are never saved or applied.
 - Only import text you made or trust: loading a profile sets the game settings it lists, and the import message names them.
 
@@ -70,7 +71,7 @@ A cut-off or altered export is rejected with a message instead of half-importing
 `/uisnap` open or close the window, `save <name>`, `load <name>`, `diff <name>` (what differs from now), `export <name>`, `import`, `list`, `show <name>`, `delete <name>`, `cvars <name>`, `keys <name>`, `editmode <name>`, `addons <name>`, `minimap on|off`.
 
 ### Status (Forever beta, interface 16001)
-Confirmed working in the Forever beta: saving, loading chat windows and channels, restoring changed settings, the window and minimap opening, Export/Import of a profile.
+Confirmed working in the Forever beta: saving, loading chat windows and channels, restoring changed settings, the window and minimap button opening, Export/Import of a profile.
 Not yet confirmed live: restoring key bindings, restoring Action Bar toggles, automatic reload after load, and Export/Import of very large profiles through the clipboard. Please report problems on GitHub.
 
-Free and open source: https://github.com/Nekramess/UISnapshot
+Free and open source (MIT): https://github.com/Nekramess/UISnapshot
