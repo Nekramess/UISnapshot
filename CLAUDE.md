@@ -27,6 +27,10 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Importing must not add names to the tracked list (it did in 0.3.0 and polluted it).
 - Action bars: `GetActionBarToggles`/`SetActionBarToggles`; the second only registers state for the next load, so it needs the reload. Slot `i` is shown as "Action Bar i+1" (naming from the wiki's description, not verified in Forever).
 
+## Window lessons (keep these)
+- Frames from `CreateFrame` start SHOWN in the real client. Any lazily built frame must `Hide()` at the end of its build, or a build-then-toggle opens-then-hides it (0.5.0 needed two presses; fixed in 0.5.1, user report 4 Oct 2026; the fix is verified only in the mock until the user confirms).
+- `tests/mock_env.py` is the shared mock client (its frames start shown, like the real one). `tests/first_open_test.py` checks first-use behaviour on fresh runtimes; it fails (9 checks) against the 0.5.0 `UI.lua`.
+
 ## Confirmed vs untested (update when you learn more)
 - Confirmed in the Forever beta, 1 Oct 2026 (user screenshots/export): `C_EditMode.GetLayouts()` and `ConvertLayoutInfoToString` work (6 custom layouts exported as strings); `GetChatWindowInfo` works (10 windows); all 7 default CVar names returned values; 26 addons listed; `/uisnap save`, `show` and `editmode` ran and the copy box opened and showed the strings.
 - Bug found in 0.1.0: "(was active)" never appeared. `GetLayouts().activeLayout` is probably offset by the preset layouts (unconfirmed). 0.1.1 asks `EditModeManagerFrame:GetActiveLayoutInfo()` instead; that call is untested in the live client.

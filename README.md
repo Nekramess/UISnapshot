@@ -61,6 +61,8 @@ Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, a
 
 `diff` and CVar restore also passed a flip-and-restore test (1 Oct 2026).
 
+**0.5.1:** fixes the window needing two presses to open (cause: new frames start visible, so the first toggle hid it). Verified in the mock only; not yet confirmed live.
+
 **Untested in the live client (0.5.0):** capturing and restoring all changed game settings, the action bar toggles (including whether they are the setting that controls "enable Action Bar 2" in Forever), the deny list, auto-reload (is `ReloadUI` allowed from addon code?), the post-reload report, the minimap button, Export and Import with ~100 or more CVars in a profile (the text will be longer, which has not been tried through a real clipboard), and the button window beyond screenshots.
 
 Edit Mode layouts are saved as strings but are not applied automatically (an attempt to do that in 0.4.0 did not work in the beta and was removed); paste one into Edit Mode's Import. Profiles live in `WTF/Account/<account>/SavedVariables/UISnapshot.lua` and need to be copied to the new install by hand.

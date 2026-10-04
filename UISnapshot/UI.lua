@@ -225,6 +225,7 @@ local function buildImport()
     cancel:SetText(CANCEL)
     cancel:SetScript("OnClick", function() f:Hide() end)
 
+    f:Hide()
     importFrame = f
     return f
 end
@@ -368,6 +369,7 @@ local function build()
         if delta > 0 then self:ScrollUp() else self:ScrollDown() end
     end)
     ui.log = log
+    f:Hide()   -- CreateFrame frames start visible; the first /uisnap must open it, not hide it
     ui.frame = f
     frame = f
 
@@ -376,8 +378,9 @@ local function build()
 end
 
 function ns.toggleUI()
-    if not frame then build() end
-    if frame:IsShown() then
+    local fresh = not frame
+    if fresh then build() end
+    if not fresh and frame:IsShown() then
         frame:Hide()
     else
         frame:Show()
