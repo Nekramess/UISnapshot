@@ -34,7 +34,7 @@ You spend hours tuning chat windows, game settings and Edit Mode layouts. UI Sna
 - The list of enabled addons
 
 ### What it does not save
-What is on your action bars, keys bound directly to spells or macros (not confirmed), raid frame profiles, and other addons' own settings. Edit Mode layouts are saved but not applied automatically; you paste them into Edit Mode's own Import box (see below).
+What is on your action bars, keys bound directly to spells or macros (not confirmed), raid frame profiles, and other addons' own settings. Edit Mode layouts are saved but not applied automatically; you paste them into Edit Mode's own Import box (see "Moving your UI" below).
 
 ### Open it
 Type `/uisnap`, or click the gear button on the minimap (drag it to move it; it can be turned off in the window).
