@@ -43,22 +43,24 @@ Type `/uisnap`, or click the gear button on the minimap (drag it to move it; it 
 1. Open the window, type a name, press **Save**.
 2. On another character, select the profile and press **Load**. The UI reloads by itself and prints a report of what changed.
 
-### Export and import (move a profile to a new install)
-Profiles live in your WTF folder, which a fresh install does not have, so use text:
+### Moving your UI to a new install (Export, Import, Load, Edit Mode, reload)
+Profiles live in your WTF folder, which a fresh install does not have, so move them as text. **Import only stores the profile; Load is what applies it.** Edit Mode layouts are the one part you paste in by hand.
 
-**Export (old install)**
+**On the old install**
 1. Open `/uisnap`, select the profile, press **Export**.
 2. Press Ctrl+C in the box that opens (click in it first if the text is not highlighted).
 3. Paste it into a text file and keep it (tens of thousands of characters for a full UI, so use a text file, not a chat message).
+4. Press **Edit Mode strings**, and copy each layout string you want into the same text file (the box shows the layout name above each string).
 
-**Import (new install)**
-1. Open `/uisnap` and press **Import**.
-2. Paste the text. Optionally type a name in "Save as" (blank keeps the exported name).
-3. Press **Import**. The UI reloads and prints a report.
+**On the new install** (UI Snapshot installed and enabled)
+1. Open `/uisnap` and press **Import**. Paste the export text, optionally type a name in "Save as" (blank keeps the exported name), press **Import**. This only saves the profile in the addon; nothing in your game has changed yet. The UI reloads and prints what was imported.
+2. Open `/uisnap` again, select the imported profile, press **Load**. This applies your chat windows, game settings and key bindings. The UI reloads by itself and prints a report of what changed.
+3. Open Edit Mode and use its own Import option to paste your layout string. UI Snapshot cannot apply Edit Mode layouts for you.
+4. Type `/reload` once more so everything settles.
 
-**Edit Mode layouts:** select the profile and press **Edit Mode strings**. Copy one string, then open Edit Mode, use its layout menu's Import option, and paste it.
+A cut-off or altered export is rejected with a message instead of half-importing. If you switch off "Reload the UI after Load..." in the window, type `/reload` yourself after steps 1 and 2.
 
-A cut-off or altered export is rejected with a message instead of half-importing.
+To copy a profile between characters on the same install, skip Export and Import: just select the profile and press **Load**.
 
 ### Safety
 - Imports are read as data only; pasted text is never run as code.
