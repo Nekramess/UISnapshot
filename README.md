@@ -21,7 +21,8 @@ Copy the `UISnapshot` folder into `World of Warcraft/_classic_beta_/Interface/Ad
 | `/uisnap addons <name>` | Enable the saved addons that are installed but off |
 | `/uisnap editmode <name>` | Open a copy box with the saved Edit Mode layout strings |
 | `/uisnap minimap [on\|off]` | Show, hide or toggle the minimap button |
-| `/uisnap cvars <name>` | Open a box listing every saved game setting |
+| `/uisnap cvars <name>` | Open a box listing every saved game setting and key binding |
+| `/uisnap keys <name>` | Open a box listing only the saved key bindings |
 | `/uisnap bars` | Print what the game reports for the action bars |
 | `/uisnap export <name>` | Open a box with the profile as one block of text |
 | `/uisnap import` | Open the paste box (also the Import button) |
@@ -42,14 +43,32 @@ Never captured or applied, even from an imported profile: settings that belong t
 
 Check what was captured with `/uisnap cvars <name>` (or **View settings**), and compare with `/uisnap diff <name>`. `/uisnap bars` prints what the game reports for the action bars.
 
-Not covered: key bindings, what is on the action bars, raid frame profiles, anything in addons' own settings. Profiles saved before 0.5.0 only hold the 7 tracked CVars; save them again.
+Not covered: what is on the action bars, raid frame profiles, anything in addons' own settings. Profiles saved before 0.5.0 only hold the 7 tracked CVars; save them again.
 
-## Moving a profile to a new install (Export / Import)
+## Key bindings (0.6.0)
 
-Profiles live in `WTF\Account\<account>\SavedVariables\UISnapshot.lua`, which a fresh install does not have. To carry one over without copying files:
+`Save` records the keys of every command the game lists (`GetNumBindings` / `GetBinding`), including commands with no key. `Load` clears keys that should not be there, sets the saved ones with `SetBinding`, then calls `SaveBindings` for the binding set that is active (account-wide or character-specific). Not allowed in combat. A saved command the client does not list (an addon that is off) is skipped and reported, so enable the addon and load again. An imported profile can only bind keys to commands the client lists.
 
-1. In the old install: select the profile, press **Export**, press Ctrl+C in the box, and paste it into a text file you keep (about 20,000 characters for a full UI).
-2. In the new install: press **Import**, paste, press Import. Blank "Save as" keeps the exported name.
+Not captured (unverified expectation, not yet tested live): keys bound to spells, macros, items or `CLICK` commands that are not in the game's binding list. Check with `/uisnap diff <name>` and `/uisnap keys <name>`. Profiles saved before 0.6.0 have no key bindings; save again.
+
+## Moving a profile to a new install (Export / Import / Load)
+Profiles live in your WTF folder, which a fresh install does not have, so move them as text. **Import only stores the profile; Load is what applies it.** Edit Mode layouts are the one part you paste in by hand.
+
+**On the old install**
+1. Open `/uisnap`, select the profile, press **Export**.
+2. Press Ctrl+C in the box that opens (click in it first if the text is not highlighted).
+3. Paste it into a text file and keep it (tens of thousands of characters for a full UI, so use a text file, not a chat message).
+4. Press **Edit Mode strings**, and copy each layout string you want into the same text file (the box shows the layout name above each string).
+
+**On the new install** (UI Snapshot installed and enabled)
+1. Open `/uisnap` and press **Import**. Paste the export text, optionally type a name in "Save as" (blank keeps the exported name), press **Import**. This only saves the profile in the addon; nothing in your game has changed yet. The UI reloads and prints what was imported.
+2. Open `/uisnap` again, select the imported profile, press **Load**. This applies your chat windows, game settings and key bindings. The UI reloads by itself and prints a report of what changed.
+3. Open Edit Mode and use its own Import option to paste your layout string. UI Snapshot cannot apply Edit Mode layouts for you.
+4. Type `/reload` once more so everything settles.
+
+If you switch off "Reload the UI after Load..." in the window, type `/reload` yourself after steps 1 and 2.
+
+To copy a profile between characters on the same install, skip Export and Import: just select the profile and press **Load**.
 
 The export starts with `UISNAP1:`, then a length and a checksum, so a cut-off or altered copy is rejected with a message instead of half-importing. Importing never runs the pasted text as code; every field is type- and size-checked, and CVar names are limited to letters, digits and underscores. Only import exports you made or trust: loading a profile sets the CVars it lists (the import message lists them).
 
@@ -60,6 +79,8 @@ Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, a
 `load` restored moved chat windows to their saved positions and the custom channels looked right (visual check, 1 Oct 2026).
 
 `diff` and CVar restore also passed a flip-and-restore test (1 Oct 2026).
+
+**0.6.0:** adds key bindings (save, diff, load, export/import). Tested in the Forever beta by the author, 4 Oct 2026 (his report: "i have tested all features"; no per-feature details recorded).
 
 **0.5.1:** fixes the window needing two presses to open (cause: new frames start visible, so the first toggle hid it). Verified in the mock only; not yet confirmed live.
 

@@ -1,4 +1,4 @@
--- UI Snapshot 0.5.1
+-- UI Snapshot 0.6.0
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -184,6 +184,126 @@ local function barsText(ab)
     return #on > 0 and ("Action Bar " .. table.concat(on, ", ")) or "none of bars 2-8"
 end
 
+-- Key bindings. Each entry is "COMMAND key1 key2..." (space separated; a tab could be
+-- altered when text goes through the game's edit boxes) for every command the client
+-- lists (GetNumBindings/GetBinding), including commands with no key, so a load can
+-- also clear keys a fresh install binds by default. Names with spaces or "|" are skipped.
+local function splitBinding(e)
+    local parts = {}
+    for part in e:gmatch("%S+") do parts[#parts + 1] = part end
+    return table.remove(parts, 1) or "", parts
+end
+
+local function cleanName(x)
+    return type(x) == "string" and x ~= "" and not x:find("[%s%c|]")
+end
+
+local function listBindings()
+    if not (GetNumBindings and GetBinding) then return nil end
+    local ok, n = pcall(GetNumBindings)
+    if not ok or type(n) ~= "number" then return nil end
+    local out = {}
+    for i = 1, n do
+        local t = { pcall(GetBinding, i) }
+        if t[1] and cleanName(t[2]) then
+            local keys = {}
+            for k = 4, #t do
+                if cleanName(t[k]) then keys[#keys + 1] = t[k] end
+            end
+            out[#out + 1] = { command = t[2], keys = keys }
+        end
+    end
+    return out
+end
+
+local function captureBindings()
+    local list = listBindings()
+    if not list then return nil end
+    local out = {}
+    for _, b in ipairs(list) do
+        local e = b.command
+        for _, k in ipairs(b.keys) do e = e .. " " .. k end
+        out[#out + 1] = e
+    end
+    return out
+end
+
+local function bindingsWithKeys(saved)
+    local n = 0
+    for _, e in ipairs(saved or {}) do
+        local _, keys = splitBinding(e)
+        if #keys > 0 then n = n + 1 end
+    end
+    return n
+end
+
+-- Compares saved bindings with the client now. Only commands the client lists are
+-- considered, so an imported profile cannot bind a key to anything else.
+local function bindingDiff(saved)
+    local cur = listBindings()
+    if not cur then return nil end
+    local have = {}
+    for _, b in ipairs(cur) do have[b.command] = b.keys end
+    local diffs, unknown = {}, 0
+    for _, e in ipairs(saved) do
+        local cmd, keys = splitBinding(e)
+        local now = have[cmd]
+        if not now then
+            if #keys > 0 then unknown = unknown + 1 end
+        else
+            local a, b = {}, {}
+            for _, k in ipairs(keys) do a[k] = true end
+            for _, k in ipairs(now) do b[k] = true end
+            local same = true
+            for k in pairs(a) do if not b[k] then same = false end end
+            for k in pairs(b) do if not a[k] then same = false end end
+            if not same then diffs[#diffs + 1] = { command = cmd, want = keys, now = now } end
+        end
+    end
+    return diffs, unknown
+end
+
+-- Sets every key of every listed command to the saved state, then saves the binding set.
+-- Not allowed in combat (SetBinding is restricted); the caller checks.
+local function applyBindings(saved)
+    if not (saved and SetBinding) then return nil end
+    local diffs, unknown = bindingDiff(saved)
+    if not diffs then return nil end
+    local r = { unbound = 0, bound = 0, failed = 0, unknown = unknown, commands = #diffs }
+    -- Unbind first so a key moving from one command to another is free when it is bound.
+    for _, d in ipairs(diffs) do
+        local want = {}
+        for _, k in ipairs(d.want) do want[k] = true end
+        for _, k in ipairs(d.now) do
+            if not want[k] then
+                if pcall(SetBinding, k, nil) then r.unbound = r.unbound + 1 else r.failed = r.failed + 1 end
+            end
+        end
+    end
+    for _, d in ipairs(diffs) do
+        for _, k in ipairs(d.want) do
+            local ok, res = pcall(SetBinding, k, d.command)
+            if ok and res then r.bound = r.bound + 1 else r.failed = r.failed + 1 end
+        end
+    end
+    local save = SaveBindings or AttemptToSaveBindings
+    if save then
+        local set = (GetCurrentBindingSet and GetCurrentBindingSet()) or 1
+        r.saved = (pcall(save, set))
+    end
+    return r
+end
+
+local function bindingLines(saved)
+    local lines = {}
+    for _, e in ipairs(saved or {}) do
+        local cmd, keys = splitBinding(e)
+        if #keys > 0 then lines[#lines + 1] = cmd .. ": " .. table.concat(keys, ", ") end
+    end
+    table.sort(lines)
+    return lines
+end
+
 local function captureAddons()
     local out = {}
     local getNum = (C_AddOns and C_AddOns.GetNumAddOns) or GetNumAddOns
@@ -239,6 +359,7 @@ local function capture(name)
         chat = captureChat(),
         cvars = nil,   -- set below
         actionBars = captureActionBars(),
+        bindings = captureBindings(),
         addons = captureAddons(),
         editMode = captureEditMode(),
     }
@@ -450,6 +571,18 @@ local function sanitizeProfile(p)
         if not (type(always) == "boolean" or type(always) == "number" or (type(always) == "string" and #always <= 10)) then always = nil end
         out.actionBars = { bars = bars, alwaysShow = always }
     end
+    if type(p.bindings) == "table" then
+        local list = {}
+        for i = 1, 3000 do
+            local e = p.bindings[i]
+            if type(e) ~= "string" then break end
+            local cmd, keys = splitBinding(e)
+            local ok = #e <= 400 and cleanName(cmd) and #cmd <= 100 and not e:find("[%c|]")
+            for _, k in ipairs(keys) do if #k > 64 then ok = false end end
+            if ok then list[#list + 1] = e end
+        end
+        out.bindings = list
+    end
     if type(p.cvarInfo) == "table" then
         out.cvarInfo = { mode = str(p.cvarInfo.mode, 60) or "?", scanned = num(p.cvarInfo.scanned) or 0 }
     end
@@ -586,6 +719,11 @@ function commands.save(name)
     else
         say(("Game settings: only the %d tracked CVars were saved (the list-all-CVars call is not available here); action bars: %s."):format(count(p.cvars), barsText(p.actionBars)))
     end
+    if p.bindings then
+        say(("Key bindings: %d commands with keys saved (of %d listed)."):format(bindingsWithKeys(p.bindings), #p.bindings))
+    else
+        say("Key bindings: not captured (GetNumBindings/GetBinding not available).")
+    end
     if p.editMode.error then say("Edit Mode: " .. p.editMode.error) end
     if ns.refresh then ns.refresh() end
 end
@@ -607,6 +745,8 @@ function commands.show(name)
             (p.screen and p.screen.height) or 0,
             (p.physical and p.physical.w) and (", window " .. p.physical.w .. "x" .. p.physical.h) or ""))
     say("Action bars saved: " .. barsText(p.actionBars) .. ". /uisnap cvars " .. name .. " lists every saved setting.")
+    say(p.bindings and ("Key bindings saved: " .. bindingsWithKeys(p.bindings) .. " commands with keys. /uisnap keys " .. name .. " lists them.")
+        or "Key bindings: none saved in this profile (save again with 0.6.0 or later).")
     say("Edit Mode active layout: " .. tostring(p.editMode.active or "not detected")
         .. " (raw index " .. tostring(p.editMode.activeIndex) .. ")")
 end
@@ -632,6 +772,22 @@ function commands.diff(name)
         end
         if #diffs > 25 then say(("  ...and %d more."):format(#diffs - 25)) end
     end
+    if p.bindings then
+        local bd, unknown = bindingDiff(p.bindings)
+        if bd then
+            if #bd == 0 then
+                say("Key bindings: all match" .. (unknown > 0 and (" (" .. unknown .. " saved commands are not in this client)") or "") .. ".")
+            else
+                say(("Key bindings: %d commands differ from now."):format(#bd))
+                for i = 1, math.min(#bd, 25) do
+                    local d = bd[i]
+                    say(("  %s: now %s, saved %s"):format(d.command,
+                        #d.now > 0 and table.concat(d.now, "/") or "none", #d.want > 0 and table.concat(d.want, "/") or "none"))
+                end
+                if #bd > 25 then say(("  ...and %d more."):format(#bd - 25)) end
+            end
+        end
+    end
     local nowBars = captureActionBars()
     if p.actionBars and nowBars then
         if barsText(p.actionBars) == barsText(nowBars) then
@@ -652,6 +808,17 @@ function commands.load(name)
             say("Action bars set to: " .. barsText(p.actionBars) .. " (shows after the reload).")
         else
             say("Could not set the action bars; turn them on in the game's settings.")
+        end
+    end
+    if p.bindings then
+        local br = applyBindings(p.bindings)
+        if br then
+            say(("Key bindings: %d keys set, %d cleared, %d failed, %d commands changed%s%s."):format(
+                br.bound, br.unbound, br.failed, br.commands,
+                br.unknown > 0 and (", " .. br.unknown .. " saved commands skipped (not in this client; enable that addon and load again)") or "",
+                br.saved and ", saved" or ", NOT saved (SaveBindings failed or is missing)"))
+        else
+            say("Key bindings: could not be applied (binding API not available).")
         end
     end
     local r = applyCVars(p.cvars)
@@ -731,8 +898,18 @@ function commands.cvars(name)
     table.sort(names)
     local lines = {}
     for _, n in ipairs(names) do lines[#lines + 1] = n .. " = " .. tostring(p.cvars[n]) end
-    if #lines == 0 then say("No CVars saved in '" .. name .. "'."); return end
-    showCopyBox(("%d saved settings in '%s'"):format(#lines, name), table.concat(lines, "\n"))
+    local keys = bindingLines(p.bindings)
+    if #lines == 0 and #keys == 0 then say("No settings saved in '" .. name .. "'."); return end
+    local text = table.concat(lines, "\n")
+    if #keys > 0 then text = text .. (#lines > 0 and "\n\n" or "") .. "-- Key bindings --\n" .. table.concat(keys, "\n") end
+    showCopyBox(("%d saved settings and %d key bindings in '%s'"):format(#lines, #keys, name), text)
+end
+
+function commands.keys(name)
+    local p = need(name); if not p then return end
+    local keys = bindingLines(p.bindings)
+    if #keys == 0 then say("No key bindings saved in '" .. name .. "'. Save again to capture them."); return end
+    showCopyBox(("%d key bindings in '%s'"):format(#keys, name), table.concat(keys, "\n"))
 end
 
 -- Prints what the game reports for the action bars, to help find where they are stored.
@@ -763,7 +940,7 @@ function commands.import()
 end
 
 function commands.help()
-    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars <name>, list, import, bars, addons <name>, editmode <name>, minimap, cvar [add|remove <name>]")
+    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars|keys <name>, list, import, bars, addons <name>, editmode <name>, minimap, cvar [add|remove <name>]")
 end
 
 SLASH_UISNAPSHOT1 = "/uisnap"

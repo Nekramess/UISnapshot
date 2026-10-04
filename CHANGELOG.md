@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.0
+- Save, diff, load and export/import key bindings (all commands the game lists; keys that should not be bound are cleared). `/uisnap keys <name>` lists them; the settings view includes them.
+
 ## 0.5.1
 - Fix: the window needed two presses (minimap button or `/uisnap`) before it opened.
 
