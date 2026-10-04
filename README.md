@@ -80,7 +80,7 @@ Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, a
 
 `diff` and CVar restore also passed a flip-and-restore test (1 Oct 2026).
 
-**0.6.0:** adds key bindings (save, diff, load, export/import). Verified in the mock only; not yet tested live.
+**0.6.0:** adds key bindings (save, diff, load, export/import). Tested in the Forever beta by the author, 4 Oct 2026 (his report: "i have tested all features"; no per-feature details recorded).
 
 **0.5.1:** fixes the window needing two presses to open (cause: new frames start visible, so the first toggle hid it). Verified in the mock only; not yet confirmed live.
 

@@ -45,7 +45,7 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Confirmed by user test, 1 Oct 2026: `diff` listed a flipped `chatMouseScroll` CVar, `load` restored it, and a second `diff` reported all CVars match.
 - Confirmed in the beta 1 Oct 2026 (user screenshot and report): the button window opens and renders; Save, Delete, list selection and the output log work; saving and loading the UI on another character worked.
 - Confirmed in the beta 1 Oct 2026 (user): chat windows restored to the right places on the new character; action bars (and other game settings) were NOT restored in 0.4.0 because only 7 CVars were tracked. 0.5.0 fixes that in code; not yet seen working live.
-- Untested in the live client (0.6.0): key binding capture/diff/load, `SaveBindings`, whether spell/macro bindings are listed.
+- User report, 4 Oct 2026: "i have tested all features" (0.6.0 in the Forever beta), and the flow Import, Load, paste Edit Mode string, /reload "is perfect". No per-feature detail was recorded, so whether spell/macro bindings are captured is still unknown.
 - Untested in the live client (0.5.0): capture/restore of all changed CVars, action bar toggles, the deny list, auto-reload via `ReloadUI`, post-reload report, minimap button, Export/Import with large profiles.
 - `show` prints UI-unit size (`GetScreenWidth/Height`, 4096x1152 at scale 0.667 in the test) and, from 0.1.1, the physical window size.
 - Launch install path and whether WTF files carry over are unconfirmed.

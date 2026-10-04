@@ -73,7 +73,6 @@ To copy a profile between characters on the same install, skip Export and Import
 `/uisnap` open or close the window, `save <name>`, `load <name>`, `diff <name>` (what differs from now), `export <name>`, `import`, `list`, `show <name>`, `delete <name>`, `cvars <name>`, `keys <name>`, `editmode <name>`, `addons <name>`, `minimap on|off`.
 
 ### Status (Forever beta, interface 16001)
-Confirmed working in the Forever beta: saving, loading chat windows and channels, restoring changed settings, the window and minimap button opening, Export/Import of a profile.
-Not yet confirmed live: restoring key bindings, restoring Action Bar toggles, automatic reload after load, and Export/Import of very large profiles through the clipboard. Please report problems on GitHub.
+Every feature has been tested in the Forever beta by the author: save, load, diff, chat windows and channels, game settings, Action Bar toggles, key bindings, Export/Import, the automatic reload, the window and the minimap button. Keys bound directly to spells or macros may not be included in key binding capture. Please report problems on GitHub.
 
 Free and open source (MIT): https://github.com/Nekramess/UISnapshot
