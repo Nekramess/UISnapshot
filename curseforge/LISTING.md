@@ -29,11 +29,12 @@ You spend hours tuning chat windows, game settings and Edit Mode layouts. UI Sna
 ### What it saves
 - Chat windows: names, positions, sizes, docking, message groups and channels
 - Game settings (CVars) that differ from the defaults, including which Action Bars 2-8 are switched on
+- Your key bindings (every command the game lists, including keys you removed)
 - Your Edit Mode layouts, saved as text strings
 - The list of enabled addons
 
 ### What it does not save
-Key bindings, what is on your action bars, raid frame profiles, and other addons' own settings. Edit Mode layouts are saved but not applied automatically; you paste them into Edit Mode's own Import box (see below).
+What is on your action bars, keys bound directly to spells or macros (not confirmed), raid frame profiles, and other addons' own settings. Edit Mode layouts are saved but not applied automatically; you paste them into Edit Mode's own Import box (see below).
 
 ### Open it
 Type `/uisnap`, or click the gear button on the minimap (drag it to move it; it can be turned off in the window).
@@ -66,10 +67,10 @@ A cut-off or altered export is rejected with a message instead of half-importing
 - Only import text you made or trust: loading a profile sets the game settings it lists, and the import message names them.
 
 ### Commands
-`/uisnap` open or close the window, `save <name>`, `load <name>`, `diff <name>` (what differs from now), `export <name>`, `import`, `list`, `show <name>`, `delete <name>`, `cvars <name>`, `editmode <name>`, `addons <name>`, `minimap on|off`.
+`/uisnap` open or close the window, `save <name>`, `load <name>`, `diff <name>` (what differs from now), `export <name>`, `import`, `list`, `show <name>`, `delete <name>`, `cvars <name>`, `keys <name>`, `editmode <name>`, `addons <name>`, `minimap on|off`.
 
 ### Status (Forever beta, interface 16001)
 Confirmed working in the Forever beta: saving, loading chat windows and channels, restoring changed settings, the window and minimap opening, Export/Import of a profile.
-Not yet confirmed live: restoring Action Bar toggles, automatic reload after load, and Export/Import of very large profiles through the clipboard. Please report problems on GitHub.
+Not yet confirmed live: restoring key bindings, restoring Action Bar toggles, automatic reload after load, and Export/Import of very large profiles through the clipboard. Please report problems on GitHub.
 
 Free and open source: https://github.com/Nekramess/UISnapshot

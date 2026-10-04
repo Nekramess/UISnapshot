@@ -27,6 +27,13 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Importing must not add names to the tracked list (it did in 0.3.0 and polluted it).
 - Action bars: `GetActionBarToggles`/`SetActionBarToggles`; the second only registers state for the next load, so it needs the reload. Slot `i` is shown as "Action Bar i+1" (naming from the wiki's description, not verified in Forever).
 
+## Key binding rules (keep these)
+- Entries are `COMMAND key1 key2` strings, space separated (not tab: tabs may not survive the game's edit boxes). Names with spaces, control characters or `|` are skipped on capture and dropped on import.
+- Load only touches commands the client lists now, so an imported profile cannot bind a key to `MACRO`, `CLICK`, `RUNSCRIPT` or anything else unlisted.
+- Order: unbind keys that should not be there, then bind, then `SaveBindings(GetCurrentBindingSet())`. Not in combat.
+- Spell/macro/item bindings are probably not in the `GetBinding` list (unverified); 0.6.0 does not capture them.
+- `tests/keybind_test.py` (30 checks, mutation-checked) covers this against a simulated binding API; nothing here is confirmed in the live client yet.
+
 ## Window lessons (keep these)
 - Frames from `CreateFrame` start SHOWN in the real client. Any lazily built frame must `Hide()` at the end of its build, or a build-then-toggle opens-then-hides it (0.5.0 needed two presses; fixed in 0.5.1, user report 4 Oct 2026; the fix is verified only in the mock until the user confirms).
 - `tests/mock_env.py` is the shared mock client (its frames start shown, like the real one). `tests/first_open_test.py` checks first-use behaviour on fresh runtimes; it fails (9 checks) against the 0.5.0 `UI.lua`.
@@ -38,6 +45,7 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Confirmed by user test, 1 Oct 2026: `diff` listed a flipped `chatMouseScroll` CVar, `load` restored it, and a second `diff` reported all CVars match.
 - Confirmed in the beta 1 Oct 2026 (user screenshot and report): the button window opens and renders; Save, Delete, list selection and the output log work; saving and loading the UI on another character worked.
 - Confirmed in the beta 1 Oct 2026 (user): chat windows restored to the right places on the new character; action bars (and other game settings) were NOT restored in 0.4.0 because only 7 CVars were tracked. 0.5.0 fixes that in code; not yet seen working live.
+- Untested in the live client (0.6.0): key binding capture/diff/load, `SaveBindings`, whether spell/macro bindings are listed.
 - Untested in the live client (0.5.0): capture/restore of all changed CVars, action bar toggles, the deny list, auto-reload via `ReloadUI`, post-reload report, minimap button, Export/Import with large profiles.
 - `show` prints UI-unit size (`GetScreenWidth/Height`, 4096x1152 at scale 0.667 in the test) and, from 0.1.1, the physical window size.
 - Launch install path and whether WTF files carry over are unconfirmed.

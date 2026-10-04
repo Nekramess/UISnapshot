@@ -21,7 +21,8 @@ Copy the `UISnapshot` folder into `World of Warcraft/_classic_beta_/Interface/Ad
 | `/uisnap addons <name>` | Enable the saved addons that are installed but off |
 | `/uisnap editmode <name>` | Open a copy box with the saved Edit Mode layout strings |
 | `/uisnap minimap [on\|off]` | Show, hide or toggle the minimap button |
-| `/uisnap cvars <name>` | Open a box listing every saved game setting |
+| `/uisnap cvars <name>` | Open a box listing every saved game setting and key binding |
+| `/uisnap keys <name>` | Open a box listing only the saved key bindings |
 | `/uisnap bars` | Print what the game reports for the action bars |
 | `/uisnap export <name>` | Open a box with the profile as one block of text |
 | `/uisnap import` | Open the paste box (also the Import button) |
@@ -42,7 +43,13 @@ Never captured or applied, even from an imported profile: settings that belong t
 
 Check what was captured with `/uisnap cvars <name>` (or **View settings**), and compare with `/uisnap diff <name>`. `/uisnap bars` prints what the game reports for the action bars.
 
-Not covered: key bindings, what is on the action bars, raid frame profiles, anything in addons' own settings. Profiles saved before 0.5.0 only hold the 7 tracked CVars; save them again.
+Not covered: what is on the action bars, raid frame profiles, anything in addons' own settings. Profiles saved before 0.5.0 only hold the 7 tracked CVars; save them again.
+
+## Key bindings (0.6.0)
+
+`Save` records the keys of every command the game lists (`GetNumBindings` / `GetBinding`), including commands with no key. `Load` clears keys that should not be there, sets the saved ones with `SetBinding`, then calls `SaveBindings` for the binding set that is active (account-wide or character-specific). Not allowed in combat. A saved command the client does not list (an addon that is off) is skipped and reported, so enable the addon and load again. An imported profile can only bind keys to commands the client lists.
+
+Not captured (unverified expectation, not yet tested live): keys bound to spells, macros, items or `CLICK` commands that are not in the game's binding list. Check with `/uisnap diff <name>` and `/uisnap keys <name>`. Profiles saved before 0.6.0 have no key bindings; save again.
 
 ## Moving a profile to a new install (Export / Import)
 
@@ -60,6 +67,8 @@ Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, a
 `load` restored moved chat windows to their saved positions and the custom channels looked right (visual check, 1 Oct 2026).
 
 `diff` and CVar restore also passed a flip-and-restore test (1 Oct 2026).
+
+**0.6.0:** adds key bindings (save, diff, load, export/import). Verified in the mock only; not yet tested live.
 
 **0.5.1:** fixes the window needing two presses to open (cause: new frames start visible, so the first toggle hid it). Verified in the mock only; not yet confirmed live.
 
