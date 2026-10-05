@@ -23,6 +23,8 @@ Copy the `UISnapshot` folder into `World of Warcraft/_classic_beta_/Interface/Ad
 | `/uisnap minimap [on\|off]` | Show, hide or toggle the minimap button |
 | `/uisnap cvars <name>` | Open a box listing every saved game setting and key binding |
 | `/uisnap keys <name>` | Open a box listing only the saved key bindings |
+| `/uisnap find <text> [profile]` | List CVars whose name or help text contains the word, whether Save would capture them, and (with a profile) whether it has them |
+| `/uisnap watch` then `/uisnap changed` | Snapshot every CVar, change one setting in Options, then list what flipped |
 | `/uisnap bars` | Print what the game reports for the action bars |
 | `/uisnap export <name>` | Open a box with the profile as one block of text |
 | `/uisnap import` | Open the paste box (also the Import button) |
@@ -44,6 +46,13 @@ Never captured or applied, even from an imported profile: settings that belong t
 Check what was captured with `/uisnap cvars <name>` (or **View settings**), and compare with `/uisnap diff <name>`. `/uisnap bars` prints what the game reports for the action bars.
 
 Not covered: what is on the action bars, raid frame profiles, anything in addons' own settings. Profiles saved before 0.5.0 only hold the 7 tracked CVars; save them again.
+
+## A setting did not come back (0.6.1)
+
+Save captures CVars. If a setting (for example Damage Meter) was not restored, find out what it is stored as:
+1. `/uisnap watch`, then tick or untick the box in Options, then `/uisnap changed`. It lists each CVar that flipped and says whether Save captures it (a CVar equal to its default, locked, read-only or on the deny list is not captured).
+2. `/uisnap find damage` lists CVars whose name or help text contains "damage"; add a profile name to see whether that profile has them.
+3. If `changed` reports that nothing flipped, the setting is not a CVar and UI Snapshot cannot capture it yet.
 
 ## Key bindings (0.6.0)
 

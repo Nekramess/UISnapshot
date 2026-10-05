@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.1
+- New `/uisnap find <text> [profile]`, `/uisnap watch` and `/uisnap changed` to find which CVar a game setting uses (for settings like Damage Meter whose CVar name is not documented) and whether Save captures it.
+
 ## 0.6.0
 - Save, diff, load and export/import key bindings (all commands the game lists; keys that should not be bound are cleared). `/uisnap keys <name>` lists them; the settings view includes them.
 

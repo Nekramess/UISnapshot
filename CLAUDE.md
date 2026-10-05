@@ -34,6 +34,10 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Spell/macro/item bindings are probably not in the `GetBinding` list (unverified); 0.6.0 does not capture them.
 - `tests/keybind_test.py` (30 checks, mutation-checked) covers this against a simulated binding API; nothing here is confirmed in the live client yet.
 
+## Finding a setting's CVar (0.6.1)
+- Forever's Advanced Options (Cooldown Manager, Swing Timer, Damage Meter) have no documented CVar names (searched the Warcraft Wiki's CVar and Damage Meter pages and the Blizzard forums, 5 Oct 2026). Do not guess names. `/uisnap find`, `watch` and `changed` show them in the live client. User report, 5 Oct 2026: both Damage Meter boxes were ticked at save time and were unticked after load, so Save is not capturing whatever stores them; cause not yet known.
+- `tests/find_test.py` (18 checks) covers the three commands against a simulated client.
+
 ## Window lessons (keep these)
 - Frames from `CreateFrame` start SHOWN in the real client. Any lazily built frame must `Hide()` at the end of its build, or a build-then-toggle opens-then-hides it (0.5.0 needed two presses; fixed in 0.5.1, user report 4 Oct 2026; the fix is verified only in the mock until the user confirms).
 - `tests/mock_env.py` is the shared mock client (its frames start shown, like the real one). `tests/first_open_test.py` checks first-use behaviour on fresh runtimes; it fails (9 checks) against the 0.5.0 `UI.lua`.

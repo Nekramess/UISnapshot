@@ -1,4 +1,4 @@
--- UI Snapshot 0.6.0
+-- UI Snapshot 0.6.1
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -912,6 +912,86 @@ function commands.keys(name)
     showCopyBox(("%d key bindings in '%s'"):format(#keys, name), table.concat(keys, "\n"))
 end
 
+-- Finding the CVar behind a setting. Some Forever settings (Damage Meter, Swing Timer,
+-- Cooldown Manager...) have no documented CVar name, so these commands show it.
+local function saveVerdict(name, v, d, locked, ro)
+    if isDenied(name) then return "never saved (machine-specific deny list)" end
+    if locked then return "locked from users: skipped" end
+    if ro then return "read-only: skipped" end
+    if v == nil then return "no value" end
+    if d == nil then return "no default reported: only saved if tracked" end
+    if v == d then return "equals its default: not saved (a fresh install already has it)" end
+    return "differs from default: Save captures it"
+end
+
+local watchSnap
+
+function commands.watch()
+    local names = allCVarNames()
+    if not names then say("C_Console.GetAllCommands is not available, so settings cannot be watched."); return end
+    watchSnap = {}
+    for _, n in ipairs(names) do watchSnap[n] = GetCVar(n) end
+    say(("Watching %d CVars. Now change ONE setting in the game's Options (tick or untick the box), then type /uisnap changed."):format(#names))
+end
+
+function commands.changed()
+    if not watchSnap then say("Type /uisnap watch first, then change a setting."); return end
+    local names = allCVarNames() or {}
+    local n = 0
+    for _, name in ipairs(names) do
+        local now = GetCVar(name)
+        local before = watchSnap[name]
+        if now ~= before then
+            n = n + 1
+            if n <= 25 then
+                local v, d, locked, ro = cvarInfo(name)
+                say(("%s: %s -> %s (default %s): %s"):format(name, tostring(before), tostring(now), tostring(d), saveVerdict(name, v, d, locked, ro)))
+            end
+        end
+    end
+    if n == 0 then
+        say("No CVar changed. That setting is probably not stored as a CVar (UI Snapshot cannot capture it yet); send the name of the setting.")
+    elseif n > 25 then
+        say(("...and %d more."):format(n - 25))
+    end
+end
+
+-- /uisnap find <text> [profile]: CVars whose name or help text contains <text>.
+function commands.find(arg)
+    local text, profile = (arg or ""):match("^%s*(%S+)%s*(.-)%s*$")
+    if not text then say("/uisnap find <text> [profile]  (e.g. /uisnap find damage)"); return end
+    local get = C_Console and C_Console.GetAllCommands
+    local ok, cmds = pcall(get or function() end)
+    if not (ok and type(cmds) == "table") then say("C_Console.GetAllCommands is not available."); return end
+    local cvarType = (Enum and Enum.ConsoleCommandType and Enum.ConsoleCommandType.Cvar) or 0
+    local needle = text:lower()
+    local p = profile ~= "" and db().profiles[profile] or nil
+    if profile ~= "" and not p then say("No profile named '" .. profile .. "'; showing live values only.") end
+    local hits = {}
+    for _, c in ipairs(cmds) do
+        if c.commandType == cvarType and type(c.command) == "string" then
+            local help = type(c.help) == "string" and c.help or ""
+            if c.command:lower():find(needle, 1, true) or help:lower():find(needle, 1, true) then
+                hits[#hits + 1] = c
+            end
+        end
+    end
+    table.sort(hits, function(a, b) return a.command < b.command end)
+    if #hits == 0 then
+        say("No CVar name or help text contains '" .. text .. "'. The setting may not be a CVar.")
+        return
+    end
+    say(("%d CVars match '%s':"):format(#hits, text))
+    for i = 1, math.min(#hits, 30) do
+        local name = hits[i].command
+        local v, d, locked, ro = cvarInfo(name)
+        local line = ("%s = %s (default %s): %s"):format(name, tostring(v), tostring(d), saveVerdict(name, v, d, locked, ro))
+        if p then line = line .. (p.cvars[name] ~= nil and ("; in '" .. profile .. "': " .. tostring(p.cvars[name])) or ("; NOT in '" .. profile .. "'")) end
+        say(line)
+    end
+    if #hits > 30 then say(("...and %d more; use a longer word."):format(#hits - 30)) end
+end
+
 -- Prints what the game reports for the action bars, to help find where they are stored.
 function commands.bars()
     local t = GetActionBarToggles and { pcall(GetActionBarToggles) } or nil
@@ -940,7 +1020,7 @@ function commands.import()
 end
 
 function commands.help()
-    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars|keys <name>, list, import, bars, addons <name>, editmode <name>, minimap, cvar [add|remove <name>]")
+    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars|keys <name>, list, import, bars, find <text>, watch, changed, addons <name>, editmode <name>, minimap, cvar [add|remove <name>]")
 end
 
 SLASH_UISNAPSHOT1 = "/uisnap"
