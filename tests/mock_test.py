@@ -69,7 +69,7 @@ local original = UISnapshotDB.profiles["Round Trip"]
 NS.ui.selected = "Round Trip"
 A.export()
 local exported = UISnapshotCopyFrame and UISnapshotCopyFrame.edit and UISnapshotCopyFrame.edit:GetText()
-check("export opened the copy box with text", type(exported) == "string" and exported:sub(1, 8) == "UISNAP1:")
+check("export opened the copy box with text", type(exported) == "string" and exported:sub(1, 9) == "UISNAP1E:")
 check("export contains the profile name", exported and exported:find("Round Trip", 1, true) ~= nil)
 
 -- wipe everything, then import into a "fresh install"

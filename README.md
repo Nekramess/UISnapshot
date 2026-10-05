@@ -79,7 +79,7 @@ If you switch off "Reload the UI after Load..." in the window, type `/reload` yo
 
 To copy a profile between characters on the same install, skip Export and Import: just select the profile and press **Load**.
 
-The export starts with `UISNAP1:`, then a length and a checksum, so a cut-off or altered copy is rejected with a message instead of half-importing. Importing never runs the pasted text as code; every field is type- and size-checked, and CVar names are limited to letters, digits and underscores. Only import exports you made or trust: loading a profile sets the CVars it lists (the import message lists them).
+The export starts with `UISNAP1E:` (older `UISNAP1:` exports still import) and is plain printable ASCII, then a length and a checksum, so a cut-off or altered copy is rejected with a message instead of half-importing. Importing never runs the pasted text as code; every field is type- and size-checked, and CVar names are limited to letters, digits and underscores. Only import exports you made or trust: loading a profile sets the CVars it lists (the import message lists them).
 
 ## Status
 

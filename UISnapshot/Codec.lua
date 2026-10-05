@@ -64,11 +64,27 @@ local function ser(v, out, depth)
     end
 end
 
-function Codec.encode(value)
+-- Safe form: every byte that is not plain printable ASCII, plus "|" (the game treats it as
+-- an escape character in edit boxes) and "~" (our own escape), becomes ~HH. The header
+-- becomes HEADERE and the length and checksum still describe the raw payload. A string
+-- with odd characters in it can leave the copy box blank; the safe form cannot.
+local ESCAPE_PATTERN = "[%z\1-\31\124\126-\255]"
+
+function Codec.escapeCount(text)
+    local _, n = text:gsub(ESCAPE_PATTERN, "")
+    return n
+end
+
+function Codec.encode(value, safe)
     local out = {}
     ser(value, out, 0)
     local payload = table.concat(out)
-    return string.format("%s:%d:%.0f:%s", HEADER, #payload, checksum(payload), payload)
+    local sum = checksum(payload)
+    local body = payload
+    if safe then
+        body = payload:gsub(ESCAPE_PATTERN, function(c) return string.format("~%02X", c:byte()) end)
+    end
+    return string.format("%s%s:%d:%.0f:%s", HEADER, safe and "E" or "", #payload, sum, body)
 end
 
 local function parse(s, pos, depth)
@@ -115,11 +131,19 @@ function Codec.decode(text)
     text = text:gsub("^%s+", "")
     text = text:gsub("%s+$", "")
     if text == "" then return nil, "Paste an export into the box first." end
-    local len, sum, start = text:match("^" .. HEADER .. ":(%d+):(%d+):()")
+    local flag, len, sum, start = text:match("^" .. HEADER .. "(E?):(%d+):(%d+):()")
     if not len then return nil, "That doesn't look like a UI Snapshot export (it should start with " .. HEADER .. ":)." end
     len, sum = tonumber(len), tonumber(sum)
     if len > MAX_TOTAL then return nil, "That export is too large." end
     local payload = text:sub(start)
+    if flag == "E" then
+        local bad = false
+        payload = payload:gsub("~(%x?%x?)", function(h)
+            if #h ~= 2 then bad = true; return "" end
+            return string.char(tonumber(h, 16))
+        end)
+        if bad then return nil, "The export is damaged (bad escape sequence). Copy it again." end
+    end
     if #payload ~= len then
         return nil, ("The export is %d characters long but should be %d. It was probably cut off or changed when copied; copy it again.")
             :format(#payload, len)

@@ -1,4 +1,4 @@
--- UI Snapshot 0.6.2
+-- UI Snapshot 0.6.3
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -525,6 +525,8 @@ local function showCopyBox(title, text)
     copyFrame:Show()
     copyFrame.edit:SetFocus()
     copyFrame.edit:HighlightText()
+    local got = copyFrame.edit:GetText()
+    return type(got) == "string" and #got or nil
 end
 
 ns.showCopyBox = showCopyBox
@@ -1033,10 +1035,23 @@ end
 
 function commands.export(name)
     local p = need(name); if not p then return end
-    local ok, text = pcall(ns.codec.encode, { v = EXPORT_VERSION, name = name, profile = p })
+    local ok, text = pcall(ns.codec.encode, { v = EXPORT_VERSION, name = name, profile = p }, true)
     if not ok then say("Export failed: " .. tostring(text)); return end
-    showCopyBox("Export of '" .. name .. "': Ctrl+C to copy", text)
+    local shown = showCopyBox("Export of '" .. name .. "': Ctrl+C to copy", text)
     say(("Export of '%s' is %d characters. Copy the whole box into a text file for safekeeping."):format(name, #text))
+    if shown and shown ~= #text then
+        say(("WARNING: the box holds %d of the %d characters, so the copy would be incomplete. Tell the author."):format(shown, #text))
+    end
+    -- Which saved settings contain characters that needed escaping (a likely cause of a blank box).
+    local odd = {}
+    for k, v in pairs(p.cvars or {}) do
+        if ns.codec.escapeCount(tostring(v)) > 0 then odd[#odd + 1] = k end
+    end
+    table.sort(odd)
+    if #odd > 0 then
+        say(("Note: %d settings have unusual characters in their value and were escaped in the export: %s%s.")
+            :format(#odd, table.concat(odd, ", ", 1, math.min(#odd, 8)), #odd > 8 and ", ..." or ""))
+    end
 end
 
 function commands.import()

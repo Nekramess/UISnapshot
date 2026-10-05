@@ -49,7 +49,7 @@ Profiles live in your WTF folder, which a fresh install does not have, so move t
 **On the old install**
 1. Open `/uisnap`, select the profile, press **Export**.
 2. Press Ctrl+C in the box that opens (click in it first if the text is not highlighted).
-3. Paste it into a text file and keep it (tens of thousands of characters for a full UI, so use a text file, not a chat message).
+3. Paste it into a text file and keep it (about 25,000 characters for a full UI, so use a text file, not a chat message).
 4. Press **Edit Mode strings**, and copy each layout string you want into the same text file (the box shows the layout name above each string).
 
 **On the new install** (UI Snapshot installed and enabled)
