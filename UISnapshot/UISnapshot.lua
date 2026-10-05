@@ -1,4 +1,4 @@
--- UI Snapshot 0.6.4
+-- UI Snapshot 0.6.5
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -116,7 +116,10 @@ end
 -- Settings that belong to this computer or this session rather than to a UI.
 -- They are never captured and never applied, even from an imported profile.
 local DENY_PREFIXES = { "gx", "last", "sound_output", "videooptions", "hwdetect", "installtype",
-    "locale", "textlocale", "audiolocale", "accountname", "portal", "realm", "wowversion" }
+    "locale", "textlocale", "audiolocale", "accountname", "portal", "realm", "wowversion",
+    -- install/client state seen in a real Forever profile (5 Oct 2026): not user preferences.
+    -- Names are not in the UI source, so this is a judgement from the names, not a verified fact.
+    "agentuid", "enginesurvey", "currentgamemode" }
 
 local function isDenied(name)
     local l = tostring(name):lower()

@@ -73,6 +73,21 @@ printed.clear()
 slash(lua, "find damage")
 check("throws: find shows the failure reason", has(printed, "the call failed") and has(printed, "restricted"))
 
+# 5b: install/client state seen in a real profile is never captured or applied
+lua, printed = setup('''
+CV.agentUID = { "wow_classic_beta", "" }
+CV.engineSurveyPatch = { "16001", "0" }
+CV.engineSurvey = { "8", "0" }
+CV.currentGameMode = { "15", "0" }
+''')
+slash(lua, "save p")
+check("install state: agentUID, engineSurvey*, currentGameMode are not captured",
+      all(cv(lua, n) is None for n in ("agentUID", "engineSurveyPatch", "engineSurvey", "currentGameMode")))
+lua.execute('UISnapshotDB.profiles.p.cvars.agentUID = "wow_forever"; UISnapshotDB.profiles.p.cvars.currentGameMode = "99"; SETS = {}')
+slash(lua, "load p")
+check("install state: a profile that contains them cannot set them",
+      lua.eval('CV.agentUID[1]') == "wow_classic_beta" and lua.eval('CV.currentGameMode[1]') == "15")
+
 # 6: a CVar the client does not have is simply skipped
 lua, printed = make_runtime()
 slash(lua, "save p")

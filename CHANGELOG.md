@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.5
+- `agentUID`, `engineSurvey*` and `currentGameMode` are never saved or applied (they describe the install or client, not your preferences; seen in a real Forever export). Profiles that already contain them skip them on Load.
+
 ## 0.6.4
 - View settings, Diff, Find and Changed now show `|` doubled and odd bytes as `?`, so settings with unusual characters (for example `nameplateStackingTypes`) cannot garble the output or blank the View settings box.
 
