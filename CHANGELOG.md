@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2
+- Fix: on Forever, Save only captured the 7 tracked settings, because the list of all settings is `ConsoleGetAllCommands` there, not `C_Console.GetAllCommands`. Save now reads the full list, so every changed setting is captured. Save again to get them.
+- Damage Meter, Damage Meter auto-reset, Swing Timer and Cooldown Manager are always saved.
+- Save prints a warning if the full list cannot be read; `/uisnap watch` says why.
+
 ## 0.6.1
 - New `/uisnap find <text> [profile]`, `/uisnap watch` and `/uisnap changed` to find which CVar a game setting uses (for settings like Damage Meter whose CVar name is not documented) and whether Save captures it.
 

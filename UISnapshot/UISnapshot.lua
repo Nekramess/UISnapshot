@@ -1,4 +1,4 @@
--- UI Snapshot 0.6.1
+-- UI Snapshot 0.6.2
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -131,18 +131,36 @@ local function cvarInfo(name)
     return v, d, locked, ro
 end
 
-local function allCVarNames()
-    local get = C_Console and C_Console.GetAllCommands
-    if not get then return nil end
+-- Forever (1.60.1 UI source) has the global ConsoleGetAllCommands() and no C_Console
+-- namespace; retail has C_Console.GetAllCommands. Try both.
+local function allCommands()
+    local get = (C_Console and C_Console.GetAllCommands) or _G.ConsoleGetAllCommands
+    if not get then return nil, "neither ConsoleGetAllCommands nor C_Console.GetAllCommands exists" end
     local ok, cmds = pcall(get)
-    if not ok or type(cmds) ~= "table" then return nil end
-    local cvarType = (Enum and Enum.ConsoleCommandType and Enum.ConsoleCommandType.Cvar) or 0
+    if not ok then return nil, "the call failed: " .. tostring(cmds) end
+    if type(cmds) ~= "table" then return nil, "the call returned " .. type(cmds) end
+    return cmds
+end
+
+local function cvarType()
+    return (Enum and Enum.ConsoleCommandType and Enum.ConsoleCommandType.Cvar) or 0
+end
+
+local function allCVarNames()
+    local cmds = allCommands()
+    if not cmds then return nil end
+    local ct = cvarType()
     local names = {}
     for _, c in ipairs(cmds) do
-        if c.commandType == cvarType and type(c.command) == "string" then names[#names + 1] = c.command end
+        if c.commandType == ct and type(c.command) == "string" then names[#names + 1] = c.command end
     end
     return names
 end
+
+-- Settings whose CVar names come from Forever's own Options source (Advanced Options:
+-- Cooldown Manager, Swing Timer, Damage Meter). Always saved, even when the full CVar
+-- list cannot be read and even when the value equals its default.
+local ALWAYS_CAPTURE = { "damageMeterEnabled", "damageMeterResetOnNewInstance", "showSwingTimer", "cooldownViewerEnabled" }
 
 -- Every CVar that differs from its default (minus the deny list), plus the tracked list.
 -- Returns the table and a small summary of how it was gathered.
@@ -158,6 +176,10 @@ local function captureCVars()
                 if v ~= nil and d ~= nil and v ~= d and not locked and not ro then out[name] = v end
             end
         end
+    end
+    for _, name in ipairs(ALWAYS_CAPTURE) do
+        local v = GetCVar(name)
+        if v ~= nil then out[name] = v end
     end
     for _, name in ipairs(db().cvars) do
         local v = GetCVar(name)
@@ -717,7 +739,7 @@ function commands.save(name)
     if p.cvarInfo and p.cvarInfo.scanned > 0 then
         say(("Game settings: %d CVars changed from default (of %d checked), %s."):format(count(p.cvars), p.cvarInfo.scanned, "action bars: " .. barsText(p.actionBars)))
     else
-        say(("Game settings: only the %d tracked CVars were saved (the list-all-CVars call is not available here); action bars: %s."):format(count(p.cvars), barsText(p.actionBars)))
+        say(("WARNING: only %d settings were saved (tracked list plus the Advanced Options ones): the game's list of all settings could not be read. Run /uisnap watch for the reason. Action bars: %s."):format(count(p.cvars), barsText(p.actionBars)))
     end
     if p.bindings then
         say(("Key bindings: %d commands with keys saved (of %d listed)."):format(bindingsWithKeys(p.bindings), #p.bindings))
@@ -928,7 +950,11 @@ local watchSnap
 
 function commands.watch()
     local names = allCVarNames()
-    if not names then say("C_Console.GetAllCommands is not available, so settings cannot be watched."); return end
+    if not names then
+        local _, why = allCommands()
+        say("The game's list of settings is not available (" .. tostring(why) .. "), so settings cannot be watched.")
+        return
+    end
     watchSnap = {}
     for _, n in ipairs(names) do watchSnap[n] = GetCVar(n) end
     say(("Watching %d CVars. Now change ONE setting in the game's Options (tick or untick the box), then type /uisnap changed."):format(#names))
@@ -960,16 +986,15 @@ end
 function commands.find(arg)
     local text, profile = (arg or ""):match("^%s*(%S+)%s*(.-)%s*$")
     if not text then say("/uisnap find <text> [profile]  (e.g. /uisnap find damage)"); return end
-    local get = C_Console and C_Console.GetAllCommands
-    local ok, cmds = pcall(get or function() end)
-    if not (ok and type(cmds) == "table") then say("C_Console.GetAllCommands is not available."); return end
-    local cvarType = (Enum and Enum.ConsoleCommandType and Enum.ConsoleCommandType.Cvar) or 0
+    local cmds, why = allCommands()
+    if not cmds then say("The game's list of settings is not available (" .. tostring(why) .. ")."); return end
+    local ct = cvarType()
     local needle = text:lower()
     local p = profile ~= "" and db().profiles[profile] or nil
     if profile ~= "" and not p then say("No profile named '" .. profile .. "'; showing live values only.") end
     local hits = {}
     for _, c in ipairs(cmds) do
-        if c.commandType == cvarType and type(c.command) == "string" then
+        if c.commandType == ct and type(c.command) == "string" then
             local help = type(c.help) == "string" and c.help or ""
             if c.command:lower():find(needle, 1, true) or help:lower():find(needle, 1, true) then
                 hits[#hits + 1] = c

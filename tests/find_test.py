@@ -10,8 +10,8 @@ EXTRA = r'''
 CV.damageMeterEnabled = { "0", "0" }
 CV.damageMeterAutoReset = { "0", "0" }
 CV.swingTimerEnabled = { "1", "0" }
-local oldGet = C_Console.GetAllCommands
-C_Console.GetAllCommands = function()
+local oldGet = ConsoleGetAllCommands
+ConsoleGetAllCommands = function()
   local t = oldGet()
   for _, c in ipairs(t) do
     if c.command == "damageMeterEnabled" then c.help = "Enables the built-in meter" end
@@ -102,10 +102,10 @@ check("changed: output capped at 25 lines plus a count", sum(1 for x in printed 
 
 # API missing
 lua, printed = make_runtime()
-lua.execute("C_Console = nil")
+lua.execute("ConsoleGetAllCommands = nil")
 slash(lua, "watch")
 slash(lua, "find damage")
-check("no C_Console: watch and find explain instead of erroring", has(printed, "cannot be watched") and has(printed, "not available"))
+check("no console list: watch and find explain why instead of erroring", has(printed, "cannot be watched") and has(printed, "not available"))
 
 for r in results: print(r)
 fails = [r for r in results if r.startswith("FAIL")]

@@ -377,13 +377,13 @@ local rp = UISnapshotDB.profiles[rt]; rp.importedOn = nil
 check("export/import keeps CVars, action bars and cvarInfo", DEEPEQ_PROFILE(before.cvars, rp.cvars) and DEEPEQ_PROFILE(before.actionBars, rp.actionBars) and DEEPEQ_PROFILE(before.cvarInfo, rp.cvarInfo))
 
 -- fallbacks when the list-all call is missing
-local savedConsole = C_Console
-C_Console = nil
+local savedConsole = ConsoleGetAllCommands
+ConsoleGetAllCommands = nil
 resetLog(); NS.commands.save("Tracked only")
 local T = UISnapshotDB.profiles["Tracked only"]
-check("without C_Console only tracked CVars are saved", T.cvarInfo.mode == "tracked list only" and T.cvars.autoLootDefault == nil and T.cvars.chatStyle ~= nil)
-check("fallback says so", text():find("only the", 1, true) ~= nil and text():find("not available here", 1, true) ~= nil)
-C_Console = savedConsole
+check("without the console list only tracked CVars are saved", T.cvarInfo.mode == "tracked list only" and T.cvars.autoLootDefault == nil and T.cvars.chatStyle ~= nil)
+check("fallback warns loudly", text():find("WARNING: only", 1, true) ~= nil and text():find("could not be read", 1, true) ~= nil)
+ConsoleGetAllCommands = savedConsole
 local savedInfo = C_CVar.GetCVarInfo
 C_CVar.GetCVarInfo = nil
 NS.commands.save("No info")

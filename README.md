@@ -39,13 +39,13 @@ The minimap button (gear icon) opens or closes the window on click and can be dr
 
 ## Game settings and action bars
 
-`Save` records every game setting (CVar) that differs from its default, found with `C_Console.GetAllCommands` and `C_CVar.GetCVarInfo`, plus anything on the tracked list, plus which of Action Bars 2-8 are switched on (`GetActionBarToggles`). `Load` sets the ones that differ from the current value, `useUiScale` before `uiScale`, and applies the action bar toggles with `SetActionBarToggles`, which the wiki says registers the state for the next load, so the reload is what makes them show.
+`Save` records every game setting (CVar) that differs from its default, found with `ConsoleGetAllCommands` (Forever's name; retail's `C_Console.GetAllCommands` is tried too) and `C_CVar.GetCVarInfo`, plus anything on the tracked list, plus which of Action Bars 2-8 are switched on (`GetActionBarToggles`). `Load` sets the ones that differ from the current value, `useUiScale` before `uiScale`, and applies the action bar toggles with `SetActionBarToggles`, which the wiki says registers the state for the next load, so the reload is what makes them show.
 
 Never captured or applied, even from an imported profile: settings that belong to the computer or session, namely names starting with `gx` (graphics device, resolution, window), `last`, `Sound_Output`, `videoOptions`, `hwDetect`, `installType`, `locale`, `textLocale`, `audioLocale`, `accountName`, `portal`, `realm`, `wowVersion`. Locked and read-only CVars are skipped too.
 
 Check what was captured with `/uisnap cvars <name>` (or **View settings**), and compare with `/uisnap diff <name>`. `/uisnap bars` prints what the game reports for the action bars.
 
-Not covered: what is on the action bars, raid frame profiles, anything in addons' own settings. Profiles saved before 0.5.0 only hold the 7 tracked CVars; save them again.
+Not covered: what is on the action bars, raid frame profiles, anything in addons' own settings. **Profiles saved before 0.6.2 on Forever only hold the 7 tracked CVars** (0.5.0 to 0.6.1 looked for a function Forever does not have, so they never saw the full list); save them again, then export again. The Advanced Options settings (Cooldown Manager `cooldownViewerEnabled`, Swing Timer `showSwingTimer`, Damage Meter `damageMeterEnabled` and `damageMeterResetOnNewInstance`) are always saved, taken from Forever's own Options source.
 
 ## A setting did not come back (0.6.1)
 
@@ -88,6 +88,8 @@ Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, a
 `load` restored moved chat windows to their saved positions and the custom channels looked right (visual check, 1 Oct 2026).
 
 `diff` and CVar restore also passed a flip-and-restore test (1 Oct 2026).
+
+**0.6.2:** fixes game settings never being captured in full on Forever (wrong function name), which is why Damage Meter and other changed settings were lost. Verified in the mock only; not yet confirmed live.
 
 **0.6.0:** adds key bindings (save, diff, load, export/import). Tested in the Forever beta by the author, 4 Oct 2026 (his report: "i have tested all features"; no per-feature details recorded).
 

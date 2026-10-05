@@ -23,9 +23,16 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Auto-applying Edit Mode layouts was tried in 0.4.0 (add-only, with backups) and did not work in the beta (user report, 1 Oct 2026), so it was removed. Do not re-add it without a verified approach: the wiki marks `C_EditMode.SaveLayouts`/`SetActiveLayout` `AllowedWhenUntainted`, and LibEditModeOverride says it cannot create layouts from strings. Layouts stay manual (saved as strings, pasted into Edit Mode's Import).
 
 ## Game settings rules (keep these)
-- Capture = every CVar changed from default (via `C_Console.GetAllCommands` + `C_CVar.GetCVarInfo`) plus the tracked list, minus the deny list. The deny list also applies on load, so an imported profile cannot set machine-specific settings.
+- Capture = every CVar changed from default (via `ConsoleGetAllCommands` + `C_CVar.GetCVarInfo`; Forever has NO `C_Console` namespace, retail's `C_Console.GetAllCommands` is the fallback) plus the tracked list, minus the deny list. The deny list also applies on load, so an imported profile cannot set machine-specific settings.
 - Importing must not add names to the tracked list (it did in 0.3.0 and polluted it).
 - Action bars: `GetActionBarToggles`/`SetActionBarToggles`; the second only registers state for the next load, so it needs the reload. Slot `i` is shown as "Action Bar i+1" (naming from the wiki's description, not verified in Forever).
+
+- ALWAYS_CAPTURE (in code): `damageMeterEnabled`, `damageMeterResetOnNewInstance`, `showSwingTimer`, `cooldownViewerEnabled`, names taken from Forever's `Blizzard_SettingsDefinitions_Frame/AdvancedOptions.lua`.
+- 0.5.0 to 0.6.1 never captured the full list on Forever (they called `C_Console.GetAllCommands`, which Forever lacks), so the "all changed CVars" capture was never live-tested before 0.6.2. The mock had `C_Console`, which hid it; the mock is now Forever-like. `tests/console_api_test.py` guards this.
+
+## Verify APIs against the Forever UI source (do this before relying on any API)
+- `git clone --depth 1 --branch forever https://github.com/Gethe/wow-ui-source` is the Forever 1.60.1 (70205) Blizzard UI source, with `Interface/AddOns/Blizzard_APIDocumentationGenerated/*Documentation.lua` listing the namespaces and signatures. Grep it for every API name before using it; the Warcraft Wiki is retail-oriented and was wrong for this.
+- Checked there on 5 Oct 2026: `ConsoleGetAllCommands` (global), `C_CVar.GetCVarInfo`, `SetCVar` (requires valid, public, non-read-only, non-secure CVar), `Enum.ConsoleCommandType`, `GetNumBindings`/`GetBinding`/`SetBinding`/`SaveBindings(GetCurrentBindingSet())`, `GetActionBarToggles`/`SetActionBarToggles`, `C_EditMode.GetLayouts`, `GetChatWindow*` all exist.
 
 ## Key binding rules (keep these)
 - Entries are `COMMAND key1 key2` strings, space separated (not tab: tabs may not survive the game's edit boxes). Names with spaces, control characters or `|` are skipped on capture and dropped on import.
@@ -49,6 +56,7 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Confirmed by user test, 1 Oct 2026: `diff` listed a flipped `chatMouseScroll` CVar, `load` restored it, and a second `diff` reported all CVars match.
 - Confirmed in the beta 1 Oct 2026 (user screenshot and report): the button window opens and renders; Save, Delete, list selection and the output log work; saving and loading the UI on another character worked.
 - Confirmed in the beta 1 Oct 2026 (user): chat windows restored to the right places on the new character; action bars (and other game settings) were NOT restored in 0.4.0 because only 7 CVars were tracked. 0.5.0 fixes that in code; not yet seen working live.
+- User report, 5 Oct 2026: with 0.6.0 the Damage Meter boxes were ticked at save and unticked after load; `/uisnap watch` printed that `C_Console.GetAllCommands` is not available. Cause confirmed from the Forever UI source (see above), fixed in 0.6.2, not yet re-tested live.
 - User report, 4 Oct 2026: "i have tested all features" (0.6.0 in the Forever beta), and the flow Import, Load, paste Edit Mode string, /reload "is perfect". No per-feature detail was recorded, so whether spell/macro bindings are captured is still unknown.
 - Untested in the live client (0.5.0): capture/restore of all changed CVars, action bar toggles, the deny list, auto-reload via `ReloadUI`, post-reload report, minimap button, Export/Import with large profiles.
 - `show` prints UI-unit size (`GetScreenWidth/Height`, 4096x1152 at scale 0.667 in the test) and, from 0.1.1, the physical window size.
