@@ -1,4 +1,4 @@
--- UI Snapshot 0.6.3
+-- UI Snapshot 0.6.4
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -21,6 +21,15 @@ local DEFAULT_CVARS = {
 
 -- Messages go to the window's log while it is open, otherwise to chat.
 local captured   -- while a Load/Import runs, its messages are also kept here
+-- Raw setting values can hold "|" (the game reads it as an escape character) or odd bytes,
+-- which can garble chat text or leave an edit box blank. Show them safely.
+local function disp(v)
+    local t = tostring(v)
+    t = t:gsub("|", "||")
+    t = t:gsub("[%z\1-\31\127-\255]", "?")
+    return t
+end
+
 local function say(msg)
     local text = "|cff33ccffUI Snapshot:|r " .. tostring(msg)
     if captured then captured[#captured + 1] = text end
@@ -792,7 +801,7 @@ function commands.diff(name)
     else
         say(("CVars: %d of %d saved settings differ from now."):format(#diffs, count(p.cvars)))
         for i = 1, math.min(#diffs, 25) do
-            say(("  %s: now %s, saved %s"):format(diffs[i], tostring(GetCVar(diffs[i])), tostring(p.cvars[diffs[i]])))
+            say(("  %s: now %s, saved %s"):format(diffs[i], disp(GetCVar(diffs[i])), disp(p.cvars[diffs[i]])))
         end
         if #diffs > 25 then say(("  ...and %d more."):format(#diffs - 25)) end
     end
@@ -921,7 +930,7 @@ function commands.cvars(name)
     for n in pairs(p.cvars) do names[#names + 1] = n end
     table.sort(names)
     local lines = {}
-    for _, n in ipairs(names) do lines[#lines + 1] = n .. " = " .. tostring(p.cvars[n]) end
+    for _, n in ipairs(names) do lines[#lines + 1] = n .. " = " .. disp(p.cvars[n]) end
     local keys = bindingLines(p.bindings)
     if #lines == 0 and #keys == 0 then say("No settings saved in '" .. name .. "'."); return end
     local text = table.concat(lines, "\n")
@@ -973,7 +982,7 @@ function commands.changed()
             n = n + 1
             if n <= 25 then
                 local v, d, locked, ro = cvarInfo(name)
-                say(("%s: %s -> %s (default %s): %s"):format(name, tostring(before), tostring(now), tostring(d), saveVerdict(name, v, d, locked, ro)))
+                say(("%s: %s -> %s (default %s): %s"):format(name, disp(before), disp(now), disp(d), saveVerdict(name, v, d, locked, ro)))
             end
         end
     end
@@ -1012,8 +1021,8 @@ function commands.find(arg)
     for i = 1, math.min(#hits, 30) do
         local name = hits[i].command
         local v, d, locked, ro = cvarInfo(name)
-        local line = ("%s = %s (default %s): %s"):format(name, tostring(v), tostring(d), saveVerdict(name, v, d, locked, ro))
-        if p then line = line .. (p.cvars[name] ~= nil and ("; in '" .. profile .. "': " .. tostring(p.cvars[name])) or ("; NOT in '" .. profile .. "'")) end
+        local line = ("%s = %s (default %s): %s"):format(name, disp(v), disp(d), saveVerdict(name, v, d, locked, ro))
+        if p then line = line .. (p.cvars[name] ~= nil and ("; in '" .. profile .. "': " .. disp(p.cvars[name])) or ("; NOT in '" .. profile .. "'")) end
         say(line)
     end
     if #hits > 30 then say(("...and %d more; use a longer word."):format(#hits - 30)) end

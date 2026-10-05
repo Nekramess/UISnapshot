@@ -32,7 +32,8 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 
 ## Export format (keep these)
 - `UISNAP1E:<raw payload length>:<checksum of the raw payload>:<escaped payload>`. Escaped = every byte outside printable ASCII, plus `|` and `~`, written `~HH`. New exports always use it; `UISNAP1:` (unescaped) still imports. Reason: the 0.6.2 Export box opened empty for a 23,808-character export; the cause is not confirmed (suspects: `|` escape sequences or invalid UTF-8 in a CVar value, or length), so the box now only ever gets plain ASCII and Export prints a note naming settings that needed escaping.
-- `tests/export_box_test.py` (14 checks) and the codec tests cover this against a simulated client.
+- Confirmed live 5 Oct 2026 (user screenshot, 0.6.3): the Export box shows the `UISNAP1E:` text; Export reported 5 settings with unusual characters: `closedInfoFramesAccountWide`, `nameplateCastBarDisplay`, `nameplateInfoDisplay`, `nameplateSimplifiedTypes`, `nameplateStackingTypes`. That fits the blank box in 0.6.2 being caused by such characters (which character is not known). Values shown in chat or the View settings box go through `disp()` (`|` doubled, odd bytes `?`).
+- `tests/export_box_test.py` (19 checks) and the codec tests cover this against a simulated client.
 
 ## Verify APIs against the Forever UI source (do this before relying on any API)
 - `git clone --depth 1 --branch forever https://github.com/Gethe/wow-ui-source` is the Forever 1.60.1 (70205) Blizzard UI source, with `Interface/AddOns/Blizzard_APIDocumentationGenerated/*Documentation.lua` listing the namespaces and signatures. Grep it for every API name before using it; the Warcraft Wiki is retail-oriented and was wrong for this.
@@ -60,7 +61,7 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Confirmed by user test, 1 Oct 2026: `diff` listed a flipped `chatMouseScroll` CVar, `load` restored it, and a second `diff` reported all CVars match.
 - Confirmed in the beta 1 Oct 2026 (user screenshot and report): the button window opens and renders; Save, Delete, list selection and the output log work; saving and loading the UI on another character worked.
 - Confirmed in the beta 1 Oct 2026 (user): chat windows restored to the right places on the new character; action bars (and other game settings) were NOT restored in 0.4.0 because only 7 CVars were tracked. 0.5.0 fixes that in code; not yet seen working live.
-- User report, 5 Oct 2026 (0.6.2): Save worked but the Export box opened empty although the output said 23808 characters. 0.6.3 mitigates (see Export format); not yet re-tested live.
+- User report, 5 Oct 2026 (0.6.2): Save worked but the Export box opened empty although the output said 23808 characters. 0.6.3 fixed it (user screenshot: box shows the text). Import/Load of that export on another character not yet reported.
 - User report, 5 Oct 2026: with 0.6.0 the Damage Meter boxes were ticked at save and unticked after load; `/uisnap watch` printed that `C_Console.GetAllCommands` is not available. Cause confirmed from the Forever UI source (see above), fixed in 0.6.2, not yet re-tested live.
 - User report, 4 Oct 2026: "i have tested all features" (0.6.0 in the Forever beta), and the flow Import, Load, paste Edit Mode string, /reload "is perfect". No per-feature detail was recorded, so whether spell/macro bindings are captured is still unknown.
 - Untested in the live client (0.5.0): capture/restore of all changed CVars, action bar toggles, the deny list, auto-reload via `ReloadUI`, post-reload report, minimap button, Export/Import with large profiles.

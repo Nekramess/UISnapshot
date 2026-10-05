@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.4
+- View settings, Diff, Find and Changed now show `|` doubled and odd bytes as `?`, so settings with unusual characters (for example `nameplateStackingTypes`) cannot garble the output or blank the View settings box.
+
 ## 0.6.3
 - Fix: the Export box could open empty (seen with a 23,808-character export of a full 0.6.2 profile). Exports are now plain printable ASCII (`UISNAP1E:`): any unusual character in a saved setting, plus `|` and `~`, is written as `~HH`. Older `UISNAP1:` exports still import.
 - Export warns if the box holds fewer characters than the export, and names saved settings that contained unusual characters.

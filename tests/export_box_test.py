@@ -60,6 +60,24 @@ printed.clear()
 slash(lua, "export p")
 check("short box: WARNING says how much it holds", has(printed, "WARNING: the box holds 1000 of the"))
 
+# View settings and diff must not show raw pipes or odd bytes either
+lua, printed = make_runtime()
+lua.execute(ODD)
+slash(lua, "save p")
+slash(lua, "cvars p")
+view = lua.eval("UISnapshotCopyFrame.edit:GetText()")
+line = [l for l in view.split("\n") if l.startswith("oddPipeValue")][0]
+check("cvars view: pipes are doubled so they display literally", line == "oddPipeValue = ||cffff0000red||r ||Tpath:16||t")
+check("cvars view: every pipe in the box is part of a doubled pair", view.replace("||", "").count("|") == 0)
+bline = [l for l in view.split("\n") if l.startswith("oddBytesValue")][0]
+check("cvars view: control and high bytes shown as ?", all(32 <= ord(c) <= 126 for c in bline))
+lua.execute('CV.oddPipeValue[1] = "x|cffffffff"')
+printed.clear()
+slash(lua, "diff p")
+check("diff: odd values printed safely", has(printed, "oddPipeValue: now x||cffffffff, saved ||cffff0000red||r"))
+check("diff: no single pipe in any printed line that mentions oddPipeValue",
+      all(p.replace("|cff33ccff", "").replace("|r", "", 1).replace("||", "").count("|") == 0 for p in printed if "oddPipeValue" in p))
+
 # large profile: many odd CVars, still plain ASCII and round trips
 lua, printed = make_runtime()
 lua.execute('for i = 1, 300 do CV["bulkOdd" .. i] = { "v|" .. i .. "\\n\\255", "0" } end')
