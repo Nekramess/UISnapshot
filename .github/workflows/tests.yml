@@ -1,0 +1,30 @@
+name: Tests
+# Simulated-client tests (Lua 5.1 via lupa). They check addon logic, not the live Forever client.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install lupa
+      - name: Run every tests/*_test.py from the repo root
+        run: |
+          set -u
+          fail=0
+          for f in tests/*_test.py; do
+            echo "== $f"
+            python3 "$f" || fail=1
+          done
+          exit $fail
+      - name: Package builds with the standard name
+        run: |
+          ./tools/package.sh
+          ver=$(grep -m1 '^## Version:' UISnapshot/UISnapshot.toc | sed 's/^## Version: *//' | tr -d '\r')
+          test -f "UISnapshot-v${ver}-forever.zip"
