@@ -119,6 +119,17 @@ function actions.editmode() local n = selected(); if n then commands.editmode(n)
 function actions.export() local n = selected(); if n then commands.export(n) end end
 function actions.cvars() local n = selected(); if n then commands.cvars(n) end end
 
+-- Reload the UI now (same as /reload). Pressed on purpose, so no delay.
+function actions.reload()
+    if InCombatLockdown and InCombatLockdown() then
+        say("Can't reload in combat. Try again after combat.")
+        return
+    end
+    say("Reloading the UI...")
+    local ok = pcall(ReloadUI)
+    if not ok then say("Could not reload from the button; type /reload.") end
+end
+
 
 function actions.delete()
     local n = selected(); if not n then return end
@@ -346,6 +357,7 @@ local function build()
     checkbox(-304, "Show the minimap button",
         function() return ns.minimap.isShown() end,
         function(v) ns.minimap.setShown(v) end)
+    button(f, "Reload UI", 400, -294, 126, actions.reload)
     function ns.refreshSettings()
         for _, cb in ipairs(f.checks) do cb:SetChecked(cb.get() and true or false) end
     end

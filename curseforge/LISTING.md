@@ -28,7 +28,7 @@ You spend hours tuning chat windows, game settings and Edit Mode layouts. UI Sna
 
 ### What it saves
 - Chat windows: names, positions, sizes, docking, message groups and channels
-- Game settings (CVars) that differ from the defaults, including which Action Bars 2-8 are switched on
+- Game settings (CVars) that differ from the defaults, including which Action Bars 2-8 are switched on, plus Damage Meter, Swing Timer and Cooldown Manager
 - Your key bindings (every command the game lists, including keys you removed)
 - Your Edit Mode layouts, saved as text strings
 - The list of enabled addons
@@ -49,7 +49,7 @@ Profiles live in your WTF folder, which a fresh install does not have, so move t
 **On the old install**
 1. Open `/uisnap`, select the profile, press **Export**.
 2. Press Ctrl+C in the box that opens (click in it first if the text is not highlighted).
-3. Paste it into a text file and keep it (tens of thousands of characters for a full UI, so use a text file, not a chat message).
+3. Paste it into a text file and keep it (about 25,000 characters for a full UI, so use a text file, not a chat message).
 4. Press **Edit Mode strings**, and copy each layout string you want into the same text file (the box shows the layout name above each string).
 
 **On the new install** (UI Snapshot installed and enabled)
@@ -73,6 +73,6 @@ To copy a profile between characters on the same install, skip Export and Import
 `/uisnap` open or close the window, `save <name>`, `load <name>`, `diff <name>` (what differs from now), `export <name>`, `import`, `list`, `show <name>`, `delete <name>`, `cvars <name>`, `keys <name>`, `editmode <name>`, `addons <name>`, `minimap on|off`.
 
 ### Status (Forever beta, interface 16001)
-Every feature has been tested in the Forever beta by the author: save, load, diff, chat windows and channels, game settings, Action Bar toggles, key bindings, Export/Import, the automatic reload, the window and the minimap button. Keys bound directly to spells or macros may not be included in key binding capture. Please report problems on GitHub.
+Tested in the Forever beta by the author: save, load, diff, chat windows and channels, key bindings, Export/Import, the automatic reload, the window and the minimap button. Version 0.6.2 fixes game settings capture on Forever (earlier versions saved only a few settings, so Damage Meter, Swing Timer and similar options were lost); if you saved a profile with an older version, save it again. Keys bound directly to spells or macros may not be included in key binding capture. Please report problems on GitHub.
 
 Free and open source (MIT): https://github.com/Nekramess/UISnapshot

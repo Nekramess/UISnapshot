@@ -23,9 +23,23 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Auto-applying Edit Mode layouts was tried in 0.4.0 (add-only, with backups) and did not work in the beta (user report, 1 Oct 2026), so it was removed. Do not re-add it without a verified approach: the wiki marks `C_EditMode.SaveLayouts`/`SetActiveLayout` `AllowedWhenUntainted`, and LibEditModeOverride says it cannot create layouts from strings. Layouts stay manual (saved as strings, pasted into Edit Mode's Import).
 
 ## Game settings rules (keep these)
-- Capture = every CVar changed from default (via `C_Console.GetAllCommands` + `C_CVar.GetCVarInfo`) plus the tracked list, minus the deny list. The deny list also applies on load, so an imported profile cannot set machine-specific settings.
+- Capture = every CVar changed from default (via `ConsoleGetAllCommands` + `C_CVar.GetCVarInfo`; Forever has NO `C_Console` namespace, retail's `C_Console.GetAllCommands` is the fallback) plus the tracked list, minus the deny list. The deny list also applies on load, so an imported profile cannot set machine-specific settings.
 - Importing must not add names to the tracked list (it did in 0.3.0 and polluted it).
 - Action bars: `GetActionBarToggles`/`SetActionBarToggles`; the second only registers state for the next load, so it needs the reload. Slot `i` is shown as "Action Bar i+1" (naming from the wiki's description, not verified in Forever).
+
+- ALWAYS_CAPTURE (in code): `damageMeterEnabled`, `damageMeterResetOnNewInstance`, `showSwingTimer`, `cooldownViewerEnabled`, names taken from Forever's `Blizzard_SettingsDefinitions_Frame/AdvancedOptions.lua`.
+- 0.5.0 to 0.6.1 never captured the full list on Forever (they called `C_Console.GetAllCommands`, which Forever lacks), so the "all changed CVars" capture was never live-tested before 0.6.2. The mock had `C_Console`, which hid it; the mock is now Forever-like. `tests/console_api_test.py` guards this.
+
+## Export format (keep these)
+- `UISNAP1E:<raw payload length>:<checksum of the raw payload>:<escaped payload>`. Escaped = every byte outside printable ASCII, plus `|` and `~`, written `~HH`. New exports always use it; `UISNAP1:` (unescaped) still imports. Reason: the 0.6.2 Export box opened empty for a 23,808-character export; the cause is not confirmed (suspects: `|` escape sequences or invalid UTF-8 in a CVar value, or length), so the box now only ever gets plain ASCII and Export prints a note naming settings that needed escaping.
+- Confirmed live 5 Oct 2026 (user screenshot, 0.6.3): the Export box shows the `UISNAP1E:` text; Export reported 5 settings with unusual characters: `closedInfoFramesAccountWide`, `nameplateCastBarDisplay`, `nameplateInfoDisplay`, `nameplateSimplifiedTypes`, `nameplateStackingTypes`. That fits the blank box in 0.6.2 being caused by such characters (which character is not known). Values shown in chat or the View settings box go through `disp()` (`|` doubled, odd bytes `?`).
+- Cause of the 0.6.2 blank box (verified from the Forever UI source and the user's export file, 5 Oct 2026): those five are BITFIELD CVars (`GetCVarBitfield`/`SetCVarBitfield`; `Blizzard_SharedXMLBase/CvarUtil.lua`). Their value is a version byte (here 0x02) followed by 6-bit chunks stored as `0x40 | bits`, so it holds a control character. Blizzard's own `SetCVarBitfieldMask` ends with `SetCVar(cvar, thatRawString)`, so restoring the raw string with SetCVar is the same thing the game does (not yet confirmed live).
+- Deny list also has `agentuid`, `enginesurvey`, `currentgamemode` (seen in the user's export: `agentUID = wow_classic_beta`, `engineSurveyPatch = 16001`, `currentGameMode = 15`); chosen from the names (they are not referenced in the UI source), not verified.
+- `tests/export_box_test.py` (19 checks) and the codec tests cover this against a simulated client.
+
+## Verify APIs against the Forever UI source (do this before relying on any API)
+- `git clone --depth 1 --branch forever https://github.com/Gethe/wow-ui-source` is the Forever 1.60.1 (70205) Blizzard UI source, with `Interface/AddOns/Blizzard_APIDocumentationGenerated/*Documentation.lua` listing the namespaces and signatures. Grep it for every API name before using it; the Warcraft Wiki is retail-oriented and was wrong for this.
+- Checked there on 5 Oct 2026: `ConsoleGetAllCommands` (global), `C_CVar.GetCVarInfo`, `SetCVar` (requires valid, public, non-read-only, non-secure CVar), `Enum.ConsoleCommandType`, `GetNumBindings`/`GetBinding`/`SetBinding`/`SaveBindings(GetCurrentBindingSet())`, `GetActionBarToggles`/`SetActionBarToggles`, `C_EditMode.GetLayouts`, `GetChatWindow*` all exist.
 
 ## Key binding rules (keep these)
 - Entries are `COMMAND key1 key2` strings, space separated (not tab: tabs may not survive the game's edit boxes). Names with spaces, control characters or `|` are skipped on capture and dropped on import.
@@ -33,6 +47,10 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Order: unbind keys that should not be there, then bind, then `SaveBindings(GetCurrentBindingSet())`. Not in combat.
 - Spell/macro/item bindings are probably not in the `GetBinding` list (unverified); 0.6.0 does not capture them.
 - `tests/keybind_test.py` (30 checks, mutation-checked) covers this against a simulated binding API; nothing here is confirmed in the live client yet.
+
+## Finding a setting's CVar (0.6.1)
+- Forever's Advanced Options (Cooldown Manager, Swing Timer, Damage Meter) have no documented CVar names (searched the Warcraft Wiki's CVar and Damage Meter pages and the Blizzard forums, 5 Oct 2026). Do not guess names. `/uisnap find`, `watch` and `changed` show them in the live client. User report, 5 Oct 2026: both Damage Meter boxes were ticked at save time and were unticked after load, so Save is not capturing whatever stores them; cause not yet known.
+- `tests/find_test.py` (18 checks) covers the three commands against a simulated client.
 
 ## Window lessons (keep these)
 - Frames from `CreateFrame` start SHOWN in the real client. Any lazily built frame must `Hide()` at the end of its build, or a build-then-toggle opens-then-hides it (0.5.0 needed two presses; fixed in 0.5.1, user report 4 Oct 2026; the fix is verified only in the mock until the user confirms).
@@ -45,6 +63,8 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - Confirmed by user test, 1 Oct 2026: `diff` listed a flipped `chatMouseScroll` CVar, `load` restored it, and a second `diff` reported all CVars match.
 - Confirmed in the beta 1 Oct 2026 (user screenshot and report): the button window opens and renders; Save, Delete, list selection and the output log work; saving and loading the UI on another character worked.
 - Confirmed in the beta 1 Oct 2026 (user): chat windows restored to the right places on the new character; action bars (and other game settings) were NOT restored in 0.4.0 because only 7 CVars were tracked. 0.5.0 fixes that in code; not yet seen working live.
+- User report, 5 Oct 2026 (0.6.2): Save worked but the Export box opened empty although the output said 23808 characters. 0.6.3 fixed it (user screenshot: box shows the text). Import/Load of that export on another character not yet reported.
+- User report, 5 Oct 2026: with 0.6.0 the Damage Meter boxes were ticked at save and unticked after load; `/uisnap watch` printed that `C_Console.GetAllCommands` is not available. Cause confirmed from the Forever UI source (see above), fixed in 0.6.2, not yet re-tested live.
 - User report, 4 Oct 2026: "i have tested all features" (0.6.0 in the Forever beta), and the flow Import, Load, paste Edit Mode string, /reload "is perfect". No per-feature detail was recorded, so whether spell/macro bindings are captured is still unknown.
 - Untested in the live client (0.5.0): capture/restore of all changed CVars, action bar toggles, the deny list, auto-reload via `ReloadUI`, post-reload report, minimap button, Export/Import with large profiles.
 - `show` prints UI-unit size (`GetScreenWidth/Height`, 4096x1152 at scale 0.667 in the test) and, from 0.1.1, the physical window size.

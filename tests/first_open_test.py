@@ -72,5 +72,29 @@ lua.execute('NS.commands.save("x")')
 slash(lua, "export x")
 check("E: Export opens the copy box", lua.eval("UISnapshotCopyFrame ~= nil and UISnapshotCopyFrame:IsShown()"))
 
+
+# F: Reload UI button in the window
+lua, printed = make_runtime()
+lua.execute("""BUTTONS = {}
+local orig = CreateFrame
+CreateFrame = function(...)
+  local f = orig(...)
+  if select(1, ...) == "Button" then BUTTONS[#BUTTONS + 1] = f end
+  return f
+end
+RELOADS = 0""")
+slash(lua, "")
+lua.execute("""RELOAD_BTN = nil
+for _, b in ipairs(BUTTONS) do if b.text == "Reload UI" then RELOAD_BTN = b end end""")
+check("F: window has a Reload UI button", lua.eval("RELOAD_BTN ~= nil"))
+lua.execute("RELOAD_BTN.scripts.OnClick(RELOAD_BTN)")
+check("F: clicking it calls ReloadUI once", lua.eval("RELOADS") == 1)
+lua.execute("RELOADS = 0; InCombatLockdown = function() return true end")
+lua.execute("RELOAD_BTN.scripts.OnClick(RELOAD_BTN)")
+check("F: no reload in combat", lua.eval("RELOADS") == 0)
+lua.execute("InCombatLockdown = function() return false end; RELOAD_FAILS = true")
+lua.execute("RELOAD_BTN.scripts.OnClick(RELOAD_BTN)")
+check("F: a blocked ReloadUI does not error and reloads nothing", lua.eval("RELOADS") == 0)
+
 print("\n".join(results))
 sys.exit(1 if any(r.startswith("FAIL") for r in results) else 0)

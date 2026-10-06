@@ -34,12 +34,14 @@ C_CVar = {
     return e[1], e[2], false, false, e[3] or false, false, e[4] or false
   end,
 }
-C_Console = { GetAllCommands = function()
+-- Forever has the global ConsoleGetAllCommands and NO C_Console namespace (checked in the
+-- 1.60.1 UI source), so the mock is Forever-like. Retail-like is tested separately.
+function ConsoleGetAllCommands()
   local t = {}
   for n in pairs(CV) do table.insert(t, { command = n, commandType = 0 }) end
   table.insert(t, { command = "reloadui", commandType = 1 })      -- a command, not a CVar
   return t
-end }
+end
 Enum = { ConsoleCommandType = { Cvar = 0, Command = 1 } }
 BARS = { false, true, true, false, false, false, false }
 ALWAYS_SHOW_MULTIBARS = "1"
@@ -144,6 +146,7 @@ CURSOR = { 0, 0 }
 function GetCursorPosition() return CURSOR[1], CURSOR[2] end
 Minimap = CreateFrame("Frame", "Minimap")
 Minimap.GetWidth = function() return 140 end
+Minimap.GetHeight = function() return 140 end
 Minimap.GetCenter = function() return 1000, 500 end
 Minimap.GetEffectiveScale = function() return 1 end
 function FIRE(event) for _, f in ipairs(CREATED) do if f.scripts.OnEvent and f.registered and f.registered[event] then f.scripts.OnEvent(f, event) end end end

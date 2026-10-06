@@ -69,7 +69,7 @@ local original = UISnapshotDB.profiles["Round Trip"]
 NS.ui.selected = "Round Trip"
 A.export()
 local exported = UISnapshotCopyFrame and UISnapshotCopyFrame.edit and UISnapshotCopyFrame.edit:GetText()
-check("export opened the copy box with text", type(exported) == "string" and exported:sub(1, 8) == "UISNAP1:")
+check("export opened the copy box with text", type(exported) == "string" and exported:sub(1, 9) == "UISNAP1E:")
 check("export contains the profile name", exported and exported:find("Round Trip", 1, true) ~= nil)
 
 -- wipe everything, then import into a "fresh install"
@@ -228,6 +228,35 @@ px, py = NS.minimap.position(math.pi / 2, 80)
 check("minimap position at 90 degrees", math.abs(px) < 1e-9 and math.abs(py - 80) < 1e-9)
 check("angle to cursor (up)", math.abs(NS.minimap.angleTo(0, 0, 0, 5) - math.pi / 2) < 1e-9)
 check("angle to cursor (left)", math.abs(NS.minimap.angleTo(0, 0, -5, 0) - math.pi) < 1e-9)
+local M = NS.minimap
+local function near(a, b) return math.abs(a - b) < 1e-6 end
+local sx, sy = M.shapedPosition(math.rad(45), 80, 80, "SQUARE")
+check("square minimap: top-right corner rides the box edge, not the circle", sx > 60 and sy > 60)
+sx, sy = M.shapedPosition(math.rad(45), 80, 80, "ROUND")
+check("round minimap: 45 degrees stays on the circle", near(sx, 80 * math.cos(math.rad(45))) and near(sy, 80 * math.sin(math.rad(45))))
+sx, sy = M.shapedPosition(0, 80, 80, "SQUARE")
+check("square minimap: straight right is the middle of the right edge", near(sx, 80) and near(sy, 0))
+sx, sy = M.shapedPosition(math.rad(225), 80, 80, "CORNER-TOPRIGHT")
+check("corner-topright: bottom-left quadrant is square", sx < -60 and sy < -60)
+sx, sy = M.shapedPosition(math.rad(45), 80, 80, "CORNER-TOPRIGHT")
+check("corner-topright: top-right quadrant is round", near(sx, 80 * math.cos(math.rad(45))) and near(sy, 80 * math.sin(math.rad(45))))
+GetMinimapShape = nil
+check("no GetMinimapShape: round", M.shape() == "ROUND")
+GetMinimapShape = function() return "SQUARE" end
+check("GetMinimapShape SQUARE is followed", M.shape() == "SQUARE")
+GetMinimapShape = function() return "nonsense" end
+check("unknown shape name falls back to round", M.shape() == "ROUND")
+GetMinimapShape = function() error("boom") end
+check("erroring GetMinimapShape falls back to round", M.shape() == "ROUND")
+GetMinimapShape = function() return "SQUARE" end
+NS.commands.minimap("round")
+check("override round beats the minimap addon", M.shape() == "ROUND")
+NS.commands.minimap("auto")
+check("auto goes back to following the addon", M.shape() == "SQUARE")
+NS.commands.minimap("square"); GetMinimapShape = nil
+check("override square works without an addon", M.shape() == "SQUARE")
+NS.commands.minimap("auto")
+NS.commands.minimap("on")
 FIRE("PLAYER_LOGIN")
 local mb = UISnapshotMinimapButton
 check("minimap button created and shown", mb and mb:IsShown())
@@ -377,13 +406,13 @@ local rp = UISnapshotDB.profiles[rt]; rp.importedOn = nil
 check("export/import keeps CVars, action bars and cvarInfo", DEEPEQ_PROFILE(before.cvars, rp.cvars) and DEEPEQ_PROFILE(before.actionBars, rp.actionBars) and DEEPEQ_PROFILE(before.cvarInfo, rp.cvarInfo))
 
 -- fallbacks when the list-all call is missing
-local savedConsole = C_Console
-C_Console = nil
+local savedConsole = ConsoleGetAllCommands
+ConsoleGetAllCommands = nil
 resetLog(); NS.commands.save("Tracked only")
 local T = UISnapshotDB.profiles["Tracked only"]
-check("without C_Console only tracked CVars are saved", T.cvarInfo.mode == "tracked list only" and T.cvars.autoLootDefault == nil and T.cvars.chatStyle ~= nil)
-check("fallback says so", text():find("only the", 1, true) ~= nil and text():find("not available here", 1, true) ~= nil)
-C_Console = savedConsole
+check("without the console list only tracked CVars are saved", T.cvarInfo.mode == "tracked list only" and T.cvars.autoLootDefault == nil and T.cvars.chatStyle ~= nil)
+check("fallback warns loudly", text():find("WARNING: only", 1, true) ~= nil and text():find("could not be read", 1, true) ~= nil)
+ConsoleGetAllCommands = savedConsole
 local savedInfo = C_CVar.GetCVarInfo
 C_CVar.GetCVarInfo = nil
 NS.commands.save("No info")

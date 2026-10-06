@@ -35,6 +35,30 @@ for name, v in pairs(samples) do
   check("roundtrip " .. name, back ~= nil and DEEPEQ(v, back))
 end
 
+-- safe (escaped) form: every nasty byte round-trips and the text is plain printable ASCII
+local nasty = { "|cffff0000red|r", "|", "||", "~", "~41", "tilde ~ and pipe |", "nul\0inside", "line1\nline2\r\n", "tab\t",
+                "caf\195\169 \226\130\172", "bad utf8 \255\254\128", string.rep("|~\0\255", 500), "" }
+local safeSamples = { strings = nasty, nested = { a = { "|x", ["~k|"] = "v\n" } }, one = { "|" } }
+for name, v in pairs(safeSamples) do
+  local text = C.encode(v, true)
+  local back, err = C.decode(text)
+  check("safe roundtrip " .. name, back ~= nil and DEEPEQ(v, back))
+  check("safe text starts with the E header and has no raw pipe, control or high byte (" .. name .. ")",
+        text:sub(1, 9) == "UISNAP1E:" and not text:find("[%z\1-\31\124\127-\255]"))
+end
+do
+  local text = C.encode({ "a|b", "c\n" }, true)
+  check("safe: no raw pipe, control or high byte anywhere", not text:find("[%z\1-\31\124\127-\255]"))
+  check("escapeCount counts pipe, tilde, control and high bytes", C.escapeCount("a|b~c\n\255d") == 4 and C.escapeCount("plain text 123") == 0)
+  check("old unescaped exports still import", DEEPEQ(C.decode(C.encode({ "x|y" })), { "x|y" }))
+  local good = C.encode({ "pipe|" }, true)
+  check("safe: stray ~ is rejected", select(1, C.decode((good:gsub("~7C", "~")))) == nil)
+  check("safe: ~ with one hex digit at the end is rejected", select(1, C.decode(good:sub(1, -4) .. "~7")) == nil)
+  check("safe: ~ with non-hex digits is rejected", select(1, C.decode((good:gsub("~7C", "~ZZ")))) == nil)
+  check("safe: damaged escaped text fails the checksum or length", select(1, C.decode((good:gsub("~7C", "~7D")))) == nil)
+  check("safe: cut-off text is reported", select(1, C.decode(good:sub(1, -3))) == nil)
+end
+
 -- numbers survive bit-exact
 local back = C.decode(C.encode({ x = 0.66666668653488 }))
 check("float is bit-exact", back.x == 0.66666668653488)
