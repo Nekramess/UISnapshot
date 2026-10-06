@@ -8,7 +8,7 @@
 | Summary | Save your chat windows, game settings, Edit Mode layouts and addon list under a name, then restore or export them on a fresh install. |
 | License | MIT |
 | Logo | `docs/logo.png` (400x400 PNG, original artwork, same style as the other addons) |
-| File | `UISnapshot-v0.5.1-forever.zip` (from `tools/package.sh`) |
+| File | `UISnapshot-v<Version>-forever.zip` from `tools/package.sh`, uploaded as built (see `docs/RELEASING.md`) |
 | Game version | WoW Forever 1.60.1 (the version Chronicle Forever's listing shows; confirm it is in the dropdown) |
 | Release type | Release |
 | Changelog | `CHANGELOG.md`, 0.5.1 section |
