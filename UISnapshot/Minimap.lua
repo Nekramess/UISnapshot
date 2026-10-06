@@ -20,6 +20,56 @@ function mm.angleTo(cx, cy, px, py)
     return math.atan2(py - cy, px - cx)
 end
 
+-- Which quadrants of the minimap are round, per the GetMinimapShape convention
+-- (https://warcraft.wiki.gg/wiki/GetMinimapShape). Order: bottom-right,
+-- bottom-left, top-right, top-left. true = round, false = square corner.
+local SHAPES = {
+    ["ROUND"] = {true, true, true, true},
+    ["SQUARE"] = {false, false, false, false},
+    ["CORNER-TOPLEFT"] = {false, false, false, true},
+    ["CORNER-TOPRIGHT"] = {false, false, true, false},
+    ["CORNER-BOTTOMLEFT"] = {false, true, false, false},
+    ["CORNER-BOTTOMRIGHT"] = {true, false, false, false},
+    ["SIDE-LEFT"] = {false, true, false, true},
+    ["SIDE-RIGHT"] = {true, false, true, false},
+    ["SIDE-TOP"] = {false, false, true, true},
+    ["SIDE-BOTTOM"] = {true, true, false, false},
+    ["TRICORNER-TOPLEFT"] = {false, true, true, true},
+    ["TRICORNER-TOPRIGHT"] = {true, false, true, true},
+    ["TRICORNER-BOTTOMLEFT"] = {true, true, false, true},
+    ["TRICORNER-BOTTOMRIGHT"] = {true, true, true, false},
+}
+mm.SHAPES = SHAPES
+
+-- Shape name to use: the saved override ("round" or "square") or, in auto mode,
+-- whatever the minimap addon reports through GetMinimapShape.
+function mm.shape()
+    local mode = db().settings.minimap.shape
+    if mode == "square" then return "SQUARE" end
+    if mode == "round" then return "ROUND" end
+    local fn = _G.GetMinimapShape
+    if type(fn) == "function" then
+        local ok, name = pcall(fn)
+        if ok and type(name) == "string" and SHAPES[name:upper()] then return name:upper() end
+    end
+    return "ROUND"
+end
+
+-- Offset from the minimap centre for an angle, following the minimap's shape.
+-- halfW/halfH are the distances to the edge the button rides on. Pure.
+function mm.shapedPosition(angle, halfW, halfH, shapeName)
+    local x, y = math.cos(angle), math.sin(angle)
+    local q = 1
+    if x < 0 then q = q + 1 end
+    if y > 0 then q = q + 2 end
+    local quads = SHAPES[shapeName or "ROUND"] or SHAPES.ROUND
+    if quads[q] then return x * halfW, y * halfH end
+    -- square corner: push out to the box edge instead of the circle
+    local dw = math.sqrt(2 * halfW * halfW) - 10
+    local dh = math.sqrt(2 * halfH * halfH) - 10
+    return math.max(-halfW, math.min(x * dw, halfW)), math.max(-halfH, math.min(y * dh, halfH))
+end
+
 local function parent()
     return _G.Minimap or UIParent
 end
@@ -27,8 +77,12 @@ end
 local function place()
     if not button then return end
     local m = parent()
-    local radius = (m:GetWidth() or 140) / 2 + 10
-    local x, y = mm.position(math.rad(db().settings.minimap.angle or 215), radius)
+    local w = m:GetWidth()
+    if type(w) ~= "number" then w = 140 end
+    local h = m.GetHeight and m:GetHeight()
+    if type(h) ~= "number" then h = w end
+    local halfW, halfH = w / 2 + 10, h / 2 + 10
+    local x, y = mm.shapedPosition(math.rad(db().settings.minimap.angle or 215), halfW, halfH, mm.shape())
     button:ClearAllPoints()
     button:SetPoint("CENTER", m, "CENTER", x, y)
 end
@@ -116,6 +170,12 @@ end
 
 function ns.commands.minimap(arg)
     arg = (arg or ""):lower()
+    if arg == "square" or arg == "round" or arg == "auto" then
+        db().settings.minimap.shape = (arg ~= "auto") and arg or nil
+        mm.apply()
+        say("Minimap button shape: " .. arg .. (arg == "auto" and " (follows your minimap addon)." or "."))
+        return
+    end
     if arg == "on" or arg == "show" then mm.setShown(true)
     elseif arg == "off" or arg == "hide" then mm.setShown(false)
     else mm.setShown(not mm.isShown()) end

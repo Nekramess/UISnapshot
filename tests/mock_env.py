@@ -146,6 +146,7 @@ CURSOR = { 0, 0 }
 function GetCursorPosition() return CURSOR[1], CURSOR[2] end
 Minimap = CreateFrame("Frame", "Minimap")
 Minimap.GetWidth = function() return 140 end
+Minimap.GetHeight = function() return 140 end
 Minimap.GetCenter = function() return 1000, 500 end
 Minimap.GetEffectiveScale = function() return 1 end
 function FIRE(event) for _, f in ipairs(CREATED) do if f.scripts.OnEvent and f.registered and f.registered[event] then f.scripts.OnEvent(f, event) end end end

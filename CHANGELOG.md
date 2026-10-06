@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.7
+- The minimap button now follows a square (or other non-round) minimap: it uses `GetMinimapShape`, which minimap addons define, the same way other addon buttons do. `/uisnap minimap square`, `round` or `auto` overrides it if your minimap addon does not report its shape. Not yet seen in the live client.
+
 ## 0.6.6
 - New "Reload UI" button in the window (same as `/reload`; refuses in combat). Handy after pasting an Edit Mode layout.
 

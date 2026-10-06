@@ -1,4 +1,4 @@
--- UI Snapshot 0.6.6
+-- UI Snapshot 0.6.7
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -1072,7 +1072,7 @@ function commands.import()
 end
 
 function commands.help()
-    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars|keys <name>, list, import, bars, find <text>, watch, changed, addons <name>, editmode <name>, minimap, cvar [add|remove <name>]")
+    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars|keys <name>, list, import, bars, find <text>, watch, changed, addons <name>, editmode <name>, minimap [on|off|square|round|auto], cvar [add|remove <name>]")
 end
 
 SLASH_UISNAPSHOT1 = "/uisnap"

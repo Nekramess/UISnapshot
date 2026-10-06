@@ -228,6 +228,35 @@ px, py = NS.minimap.position(math.pi / 2, 80)
 check("minimap position at 90 degrees", math.abs(px) < 1e-9 and math.abs(py - 80) < 1e-9)
 check("angle to cursor (up)", math.abs(NS.minimap.angleTo(0, 0, 0, 5) - math.pi / 2) < 1e-9)
 check("angle to cursor (left)", math.abs(NS.minimap.angleTo(0, 0, -5, 0) - math.pi) < 1e-9)
+local M = NS.minimap
+local function near(a, b) return math.abs(a - b) < 1e-6 end
+local sx, sy = M.shapedPosition(math.rad(45), 80, 80, "SQUARE")
+check("square minimap: top-right corner rides the box edge, not the circle", sx > 60 and sy > 60)
+sx, sy = M.shapedPosition(math.rad(45), 80, 80, "ROUND")
+check("round minimap: 45 degrees stays on the circle", near(sx, 80 * math.cos(math.rad(45))) and near(sy, 80 * math.sin(math.rad(45))))
+sx, sy = M.shapedPosition(0, 80, 80, "SQUARE")
+check("square minimap: straight right is the middle of the right edge", near(sx, 80) and near(sy, 0))
+sx, sy = M.shapedPosition(math.rad(225), 80, 80, "CORNER-TOPRIGHT")
+check("corner-topright: bottom-left quadrant is square", sx < -60 and sy < -60)
+sx, sy = M.shapedPosition(math.rad(45), 80, 80, "CORNER-TOPRIGHT")
+check("corner-topright: top-right quadrant is round", near(sx, 80 * math.cos(math.rad(45))) and near(sy, 80 * math.sin(math.rad(45))))
+GetMinimapShape = nil
+check("no GetMinimapShape: round", M.shape() == "ROUND")
+GetMinimapShape = function() return "SQUARE" end
+check("GetMinimapShape SQUARE is followed", M.shape() == "SQUARE")
+GetMinimapShape = function() return "nonsense" end
+check("unknown shape name falls back to round", M.shape() == "ROUND")
+GetMinimapShape = function() error("boom") end
+check("erroring GetMinimapShape falls back to round", M.shape() == "ROUND")
+GetMinimapShape = function() return "SQUARE" end
+NS.commands.minimap("round")
+check("override round beats the minimap addon", M.shape() == "ROUND")
+NS.commands.minimap("auto")
+check("auto goes back to following the addon", M.shape() == "SQUARE")
+NS.commands.minimap("square"); GetMinimapShape = nil
+check("override square works without an addon", M.shape() == "SQUARE")
+NS.commands.minimap("auto")
+NS.commands.minimap("on")
 FIRE("PLAYER_LOGIN")
 local mb = UISnapshotMinimapButton
 check("minimap button created and shown", mb and mb:IsShown())
