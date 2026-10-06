@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.6
+- New "Reload UI" button in the window (same as `/reload`; refuses in combat). Handy after pasting an Edit Mode layout.
+
 ## 0.6.5
 - `agentUID`, `engineSurvey*` and `currentGameMode` are never saved or applied (they describe the install or client, not your preferences; seen in a real Forever export). Profiles that already contain them skip them on Load.
 
