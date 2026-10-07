@@ -89,6 +89,8 @@ Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, a
 
 `diff` and CVar restore also passed a flip-and-restore test (1 Oct 2026).
 
+**0.6.7:** the minimap button follows square minimaps through `GetMinimapShape` (a function minimap addons define; Forever's own UI source does not). Verified in the mock only; not yet confirmed live.
+
 **0.6.2:** fixes game settings never being captured in full on Forever (wrong function name), which is why Damage Meter and other changed settings were lost. Verified in the mock only; not yet confirmed live.
 
 **0.6.0:** adds key bindings (save, diff, load, export/import). Tested in the Forever beta by the author, 4 Oct 2026 (his report: "i have tested all features"; no per-feature details recorded).
