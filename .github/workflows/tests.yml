@@ -28,3 +28,5 @@ jobs:
           ./tools/package.sh
           ver=$(grep -m1 '^## Version:' UISnapshot/UISnapshot.toc | sed 's/^## Version: *//' | tr -d '\r')
           test -f "UISnapshot-v${ver}-forever.zip"
+      - name: Release zip in releases/ is current
+        run: bash tools/check-release.sh
