@@ -1,2 +1,4 @@
 *.zip
+!releases/*.zip
 __pycache__/
+dist/

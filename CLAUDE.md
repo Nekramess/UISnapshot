@@ -7,11 +7,12 @@ Read `claude/wow-forever-addons-overview.md` (project doc) first.
 - `tests/codec_test.py`: round-trip, damage and fuzz tests for `Codec.lua` under Lua 5.1.
 - `tests/mock_test.py`: runs the Lua under Lua 5.1 (lupa) against a simulated client. Not the live client.
 - `tools/package.sh`, `.github/workflows/package.yml`: build `UISnapshot-v<Version>-forever.zip` from the `.toc` version.
+- `tools/release.sh` stores the current zip in `releases/` (the one place to download it for CurseForge); `tools/check-release.sh`, run by the `Tests` Action, fails if that zip is missing, misnamed or stale.
 
 ## Conventions
 - Every client call that might not exist in Forever goes through `pcall`/existence checks; one failure must not abort a save or load.
 - Edit Mode layouts are saved as strings and pasted by hand; do not apply them from code (taint risk, untested).
-- Bump `## Version` for every release; never re-upload a version under a new name.
+- One piece of work = one branch = one PR. While Anthony is testing and changes go back and forth, add commits to the same branch and PR and keep `## Version` as it is; run `bash tools/release.sh` in every commit that changes addon files so `releases/UISnapshot-v<Version>-forever.zip` is the one he tests. The version is finalized only when Anthony says "push" (then bump `## Version`, run `bash tools/release.sh`, push to the same PR). Never re-upload a version under a new name.
 - File name standard, all our addons: `<Addon>-v<Version>-forever.zip` (here `UISnapshot-v<Version>-forever.zip`), built by `tools/package.sh`, uploaded exactly as built. Never zip by hand, never rename, never put the version first or add spaces (SpellCDTracker had `v0.12.0 SpellCDTracker.zip` on CurseForge). Full text: `docs/RELEASING.md`.
 - Never commit to `main`: branch, PR, Anthony merges.
 
