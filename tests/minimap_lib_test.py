@@ -18,6 +18,8 @@ check("toc lists the libraries in dependency order, before Minimap.lua",
       and toc.index(want[-1]) < toc.index("Minimap.lua"))
 check("mock_env loads the same files as the toc (same order)", [f.replace("UISnapshot/", "") for f in FILES] == toc)
 
+check("toc names an IconTexture (the AddOn List shows a ? without it)", "## IconTexture: Interface\\Icons\\" in open("UISnapshot/UISnapshot.toc").read())
+
 def fire(lua, ev="PLAYER_LOGIN"): lua.execute('FIRE("%s")' % ev)
 
 # Fresh install: registered, shown, default angle in LibDBIcon's field

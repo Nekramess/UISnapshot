@@ -1,4 +1,5 @@
 ## Interface: 16001
+## IconTexture: Interface\Icons\INV_Misc_Gear_01
 ## Title: UI Snapshot
 ## Notes: Save your chat windows, CVars, Edit Mode layouts and addon list, then restore them on a fresh install.
 ## Author: Nekramess
