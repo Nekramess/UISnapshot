@@ -1,4 +1,4 @@
--- UI Snapshot 0.6.7
+-- UI Snapshot 0.6.8
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --

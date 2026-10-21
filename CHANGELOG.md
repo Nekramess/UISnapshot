@@ -1,7 +1,7 @@
 # Changelog
 
-## Next version
-- The minimap button is now registered through the standard LibDBIcon-1.0 library (embedded in `Libs/` with LibStub, CallbackHandler-1.0 and LibDataBroker-1.1). A minimap button manager had flagged the hand-built button with "This is a custom button. Please ask the addon author to use the standard LibDBIcon library instead." Position and hidden setting carry over. LibDBIcon follows square minimaps itself, so `/uisnap minimap square|round|auto` is gone (`on` and `off` stay). Simulated client only; not yet seen in the live client.
+## 0.6.8
+- The minimap button is now registered through the standard LibDBIcon-1.0 library (embedded in `Libs/` with LibStub, CallbackHandler-1.0 and LibDataBroker-1.1). A minimap button manager had flagged the hand-built button with "This is a custom button. Please ask the addon author to use the standard LibDBIcon library instead." Position and hidden setting carry over. LibDBIcon follows square minimaps itself, so `/uisnap minimap square|round|auto` is gone (`on` and `off` stay). Confirmed in the live client with Leatrix Plus (20 Oct 2026).
 
 ## 0.6.7
 - The minimap button now follows a square (or other non-round) minimap: it uses `GetMinimapShape`, which minimap addons define, the same way other addon buttons do. `/uisnap minimap square`, `round` or `auto` overrides it if your minimap addon does not report its shape. Not yet seen in the live client.
