@@ -3,7 +3,7 @@
 Read `claude/wow-forever-addons-overview.md` (project doc) first.
 
 ## Layout
-- `UISnapshot/UISnapshot.toc`, `UISnapshot.lua` (logic and slash commands) and `Minimap.lua` (own minimap button, no library) and `UI.lua` (button window and import box; wraps `ns.commands`, adds no restore logic) and `Codec.lua` (export text format; pure Lua, no WoW calls). Interface 16001, plain `.toc`, `## SavedVariables: UISnapshotDB`.
+- `UISnapshot/UISnapshot.toc`, `UISnapshot.lua` (logic and slash commands) and `Minimap.lua` (minimap button through the embedded LibDBIcon-1.0 in `UISnapshot/Libs/`: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibDBIcon-1.0; never hand-build a minimap button: a button manager flagged the hand-built one as "a custom button", CurseForge comment seen 20 Oct 2026, cause confirmed 20 Oct 2026: Leatrix Plus 'Enhance minimap' (MakeButtons in Leatrix_Plus.lua) replaces any named minimap Button without "LibDBIcon" in its name, fix confirmed live by Anthony's isolated test; saved `angle` became `minimapPos`; `tests/minimap_lib_test.py`) and `UI.lua` (button window and import box; wraps `ns.commands`, adds no restore logic) and `Codec.lua` (export text format; pure Lua, no WoW calls). Interface 16001, plain `.toc`, `## SavedVariables: UISnapshotDB`.
 - `tests/codec_test.py`: round-trip, damage and fuzz tests for `Codec.lua` under Lua 5.1.
 - `tests/mock_test.py`: runs the Lua under Lua 5.1 (lupa) against a simulated client. Not the live client.
 - `tools/package.sh`, `.github/workflows/package.yml`: build `UISnapshot-v<Version>-forever.zip` from the `.toc` version.

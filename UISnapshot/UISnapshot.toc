@@ -1,10 +1,15 @@
 ## Interface: 16001
+## IconTexture: Interface\Icons\INV_Misc_Gear_01
 ## Title: UI Snapshot
 ## Notes: Save your chat windows, CVars, Edit Mode layouts and addon list, then restore them on a fresh install.
 ## Author: Nekramess
-## Version: 0.6.7
+## Version: 0.6.8
 ## SavedVariables: UISnapshotDB
 
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 Codec.lua
 UISnapshot.lua
 Minimap.lua

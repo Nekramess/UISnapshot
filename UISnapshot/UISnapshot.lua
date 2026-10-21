@@ -1,4 +1,4 @@
--- UI Snapshot 0.6.7
+-- UI Snapshot 0.6.8
 -- Saves chat windows, selected CVars, Edit Mode layouts and the enabled-addon
 -- list under a name, and re-applies them later (e.g. on a fresh install).
 --
@@ -50,7 +50,7 @@ local function db()
     d.cvars = d.cvars or {}
     d.settings = d.settings or {}
     if d.settings.autoReload == nil then d.settings.autoReload = true end
-    d.settings.minimap = d.settings.minimap or { hide = false, angle = 215 }
+    d.settings.minimap = d.settings.minimap or { hide = false, minimapPos = 215 }   -- LibDBIcon's fields
     if #d.cvars == 0 then
         for _, name in ipairs(DEFAULT_CVARS) do d.cvars[#d.cvars + 1] = name end
     end
@@ -1072,7 +1072,7 @@ function commands.import()
 end
 
 function commands.help()
-    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars|keys <name>, list, import, bars, find <text>, watch, changed, addons <name>, editmode <name>, minimap [on|off|square|round|auto], cvar [add|remove <name>]")
+    say("/uisnap opens the window. Commands: save|load|show|diff|delete|export|cvars|keys <name>, list, import, bars, find <text>, watch, changed, addons <name>, editmode <name>, minimap [on|off], cvar [add|remove <name>]")
 end
 
 SLASH_UISNAPSHOT1 = "/uisnap"

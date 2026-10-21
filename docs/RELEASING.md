@@ -7,10 +7,10 @@ Every release zip is named **`<Addon>-v<Version>-forever.zip`**, nothing else:
 | Part | Value for this addon | Where it comes from |
 |---|---|---|
 | `<Addon>` | `UISnapshot` (no spaces, same as the folder and the `.toc` name) | the addon folder and `.toc` name (`tools/package.sh`) |
-| `v<Version>` | `v0.6.7` | the `## Version:` line in `UISnapshot/UISnapshot.toc` |
+| `v<Version>` | `v0.6.8` | the `## Version:` line in `UISnapshot/UISnapshot.toc` |
 | `-forever` | always | marks the Forever build, like other Forever addons on CurseForge |
 
-Example: `UISnapshot-v0.6.7-forever.zip`
+Example: `UISnapshot-v0.6.8-forever.zip`
 
 Rules:
 - **Build the zip with `tools/package.sh`** (or the "Package" GitHub Action, which calls it). Never zip by hand and never rename the file. Both the script and the action already use this pattern.

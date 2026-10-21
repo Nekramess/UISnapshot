@@ -11,7 +11,7 @@
 | File | `UISnapshot-v<Version>-forever.zip` from `tools/package.sh`, uploaded as built (see `docs/RELEASING.md`) |
 | Game version | WoW Forever 1.60.1 (the version Chronicle Forever's listing shows; confirm it is in the dropdown) |
 | Release type | Release |
-| Changelog | `CHANGELOG.md`, section for the version being uploaded (current: 0.6.7) |
+| Changelog | `CHANGELOG.md`, section for the version being uploaded (current: 0.6.8) |
 | Source link | https://github.com/Nekramess/UISnapshot |
 
 Release type: Release (the author tested the features and chose Release over Beta). CurseForge's app only syncs a project once it has a Release file. Features not yet confirmed in the live client are listed under Status below and in `README.md`.
@@ -73,6 +73,6 @@ To copy a profile between characters on the same install, skip Export and Import
 `/uisnap` open or close the window, `save <name>`, `load <name>`, `diff <name>` (what differs from now), `export <name>`, `import`, `list`, `show <name>`, `delete <name>`, `cvars <name>`, `keys <name>`, `editmode <name>`, `addons <name>`, `minimap on|off|square|round|auto`.
 
 ### Status (Forever beta, interface 16001)
-Tested in the Forever beta by the author: save, load, diff, chat windows and channels, key bindings, Export/Import, the automatic reload, the window and the minimap button. Version 0.6.2 fixes game settings capture on Forever (earlier versions saved only a few settings, so Damage Meter, Swing Timer and similar options were lost); if you saved a profile with an older version, save it again. Keys bound directly to spells or macros may not be included in key binding capture. Version 0.6.7 makes the minimap button follow square minimaps; this is not yet confirmed in the live client, and `/uisnap minimap square|round|auto` overrides it. Please report problems on GitHub.
+Tested in the Forever beta by the author: save, load, diff, chat windows and channels, key bindings, Export/Import, the automatic reload, the window and the minimap button. Version 0.6.2 fixes game settings capture on Forever (earlier versions saved only a few settings, so Damage Meter, Swing Timer and similar options were lost); if you saved a profile with an older version, save it again. Keys bound directly to spells or macros may not be included in key binding capture. Version 0.6.8 registers the minimap button through the standard LibDBIcon library, so minimap button managers such as Leatrix Plus handle it like any other button instead of calling it a custom button; `/uisnap minimap on|off` shows or hides it. Please report problems on GitHub.
 
 Free and open source (MIT): https://github.com/Nekramess/UISnapshot

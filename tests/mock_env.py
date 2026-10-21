@@ -2,7 +2,9 @@
 Frames made by CreateFrame start SHOWN, like the real client."""
 from lupa.lua51 import LuaRuntime
 
-FILES = ("UISnapshot/Codec.lua", "UISnapshot/UISnapshot.lua", "UISnapshot/Minimap.lua", "UISnapshot/UI.lua")
+FILES = ("UISnapshot/Libs/LibStub/LibStub.lua", "UISnapshot/Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua",
+         "UISnapshot/Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua", "UISnapshot/Libs/LibDBIcon-1.0/LibDBIcon-1.0.lua",
+         "UISnapshot/Codec.lua", "UISnapshot/UISnapshot.lua", "UISnapshot/Minimap.lua", "UISnapshot/UI.lua")
 
 MOCK_CLIENT = r'''
 NUM_CHAT_WINDOWS = 3
@@ -85,7 +87,7 @@ GetRealmName = function() return "Test" end
 InCombatLockdown = function() return false end
 GetPhysicalScreenSize = function() return 3840, 1080 end
 EditModeManagerFrame = { GetActiveLayoutInfo = function() return { layoutName = "UI" } end }
-UIParent = { GetScale = function() return 0.64 end }
+UIParent = { GetScale = function() return 0.64 end, GetWidth = function() return 1920 end, GetHeight = function() return 1080 end }
 GetScreenWidth = function() return 5120 end GetScreenHeight = function() return 1440 end
 date = os.date
 SlashCmdList = {}
@@ -112,7 +114,9 @@ local function newFrame(name)
     if k == "SetChecked" then return function(self, v) self.checked = v and true or false end end
     if k == "GetChecked" then return function(self) return self.checked end end
     if k == "AddMessage" then return function(self, v) self.lines = self.lines or {}; table.insert(self.lines, v) end end
-    if k == "CreateFontString" or k == "CreateTexture" then return function() return newFrame() end end
+    if k == "CreateFontString" then return function() return newFrame() end end
+    if k == "CreateTexture" then return function(self) local x = newFrame(); x.parent = self; return x end end
+    if k == "GetParent" then return function(self) return self.parent end end
     if type(k) == "string" and k:match("^[A-Z]") then return function() return newFrame() end end
     return rawget(t, k)
   end
@@ -120,7 +124,7 @@ local function newFrame(name)
 end
 local created = {}
 function CreateFrame(kind, name, parent, tmpl)
-  local f = newFrame(name); f.kind = kind; f.template = tmpl
+  local f = newFrame(name); f.kind = kind; f.template = tmpl; f.parent = parent
   f.shown = true   -- the real client shows frames on creation
   if name then _G[name] = f end
   table.insert(created, f)
@@ -153,14 +157,14 @@ function FIRE(event) for _, f in ipairs(CREATED) do if f.scripts.OnEvent and f.r
 """
 
 
-def make_runtime():
+def make_runtime(files=None):
     lua = LuaRuntime(unpack_returned_tuples=True)
     printed = []
     lua.globals().print = lambda *a: printed.append(" ".join(str(x) for x in a))
     lua.execute(MOCK_CLIENT)
     lua.execute(MOCK_FRAMES)
     lua.execute("NS = {}")
-    for fn in FILES:
+    for fn in (files or FILES):
         src = open(fn).read().replace("local ADDON, ns = ...", "local ADDON, ns = 'UISnapshot', NS")
         lua.execute(src)
     return lua, printed

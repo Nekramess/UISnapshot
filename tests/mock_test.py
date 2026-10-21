@@ -221,47 +221,26 @@ A.addons(); RUN_TIMERS()
 check("enable addons enabled the missing ones", enabled == 2)
 check("enable addons reloads", RELOADS == 1)
 
--- Minimap
-local px, py = NS.minimap.position(0, 80)
-check("minimap position at 0 degrees", math.abs(px - 80) < 1e-9 and math.abs(py) < 1e-9)
-px, py = NS.minimap.position(math.pi / 2, 80)
-check("minimap position at 90 degrees", math.abs(px) < 1e-9 and math.abs(py - 80) < 1e-9)
-check("angle to cursor (up)", math.abs(NS.minimap.angleTo(0, 0, 0, 5) - math.pi / 2) < 1e-9)
-check("angle to cursor (left)", math.abs(NS.minimap.angleTo(0, 0, -5, 0) - math.pi) < 1e-9)
+-- Minimap: registered through the embedded LibDBIcon-1.0 (the real library files run here)
 local M = NS.minimap
 local function near(a, b) return math.abs(a - b) < 1e-6 end
-local sx, sy = M.shapedPosition(math.rad(45), 80, 80, "SQUARE")
-check("square minimap: top-right corner rides the box edge, not the circle", sx > 60 and sy > 60)
-sx, sy = M.shapedPosition(math.rad(45), 80, 80, "ROUND")
-check("round minimap: 45 degrees stays on the circle", near(sx, 80 * math.cos(math.rad(45))) and near(sy, 80 * math.sin(math.rad(45))))
-sx, sy = M.shapedPosition(0, 80, 80, "SQUARE")
-check("square minimap: straight right is the middle of the right edge", near(sx, 80) and near(sy, 0))
-sx, sy = M.shapedPosition(math.rad(225), 80, 80, "CORNER-TOPRIGHT")
-check("corner-topright: bottom-left quadrant is square", sx < -60 and sy < -60)
-sx, sy = M.shapedPosition(math.rad(45), 80, 80, "CORNER-TOPRIGHT")
-check("corner-topright: top-right quadrant is round", near(sx, 80 * math.cos(math.rad(45))) and near(sy, 80 * math.sin(math.rad(45))))
-GetMinimapShape = nil
-check("no GetMinimapShape: round", M.shape() == "ROUND")
-GetMinimapShape = function() return "SQUARE" end
-check("GetMinimapShape SQUARE is followed", M.shape() == "SQUARE")
-GetMinimapShape = function() return "nonsense" end
-check("unknown shape name falls back to round", M.shape() == "ROUND")
-GetMinimapShape = function() error("boom") end
-check("erroring GetMinimapShape falls back to round", M.shape() == "ROUND")
-GetMinimapShape = function() return "SQUARE" end
-NS.commands.minimap("round")
-check("override round beats the minimap addon", M.shape() == "ROUND")
-NS.commands.minimap("auto")
-check("auto goes back to following the addon", M.shape() == "SQUARE")
-NS.commands.minimap("square"); GetMinimapShape = nil
-check("override square works without an addon", M.shape() == "SQUARE")
-NS.commands.minimap("auto")
-NS.commands.minimap("on")
 FIRE("PLAYER_LOGIN")
-local mb = UISnapshotMinimapButton
+local DBI = LibStub("LibDBIcon-1.0")
+local mb = DBI:GetMinimapButton("UISnapshot")
+check("registered with LibDBIcon at login", DBI:IsRegistered("UISnapshot"))
+local ldbObj = LibStub("LibDataBroker-1.1"):GetDataObjectByName("UISnapshot")
+check("LibDataBroker launcher object with an icon", ldbObj and ldbObj.type == "launcher" and ldbObj.icon ~= nil)
 check("minimap button created and shown", mb and mb:IsShown())
+check("the button is the one LibDBIcon built", mb.name == "LibDBIcon10_UISnapshot")
+check("old hand-built button frame is gone", rawget(_G, "UISnapshotMinimapButton") == nil)
+local custom = {}
+for _, fr in ipairs(CREATED) do
+  if fr.kind == "Button" and fr.parent == Minimap and not tostring(fr.name):find("^LibDBIcon10_") then custom[#custom + 1] = tostring(fr.name) end
+end
+check("no hand-built minimap button (" .. table.concat(custom, ",") .. ")", #custom == 0)
 local pt = mb.lastPoint
 check("button placed on the minimap edge", pt and pt[1] == "CENTER" and pt[2] == Minimap)
+check("default angle saved as minimapPos", NS.db().settings.minimap.minimapPos == 215)
 -- click toggles the window
 local wasShown = UISnapshotFrame:IsShown()
 mb.scripts.OnClick(mb, "LeftButton")
@@ -271,9 +250,15 @@ mb.scripts.OnClick(mb, "LeftButton")
 CURSOR = { 1000, 600 }                         -- straight up from the minimap centre (1000,500)
 mb.scripts.OnDragStart(mb)
 mb.scripts.OnUpdate(mb)
-check("drag saves the new angle (90 degrees)", math.abs(NS.db().settings.minimap.angle - 90) < 1e-6)
-check("click right after a drag is ignored", (function() local before = UISnapshotFrame:IsShown(); mb.scripts.OnClick(mb, "LeftButton"); return UISnapshotFrame:IsShown() == before end)())
-mb.scripts.OnDragStop(mb); RUN_TIMERS()
+check("drag saves the new angle (90 degrees)", near(NS.db().settings.minimap.minimapPos, 90))
+local bx, by = mb.lastPoint[4], mb.lastPoint[5]
+check("button follows the cursor to the top", near(bx, 0) and near(by, 75))
+mb.scripts.OnDragStop(mb)
+check("drag stop removes OnUpdate", mb.scripts.OnUpdate == nil)
+-- tooltip lines
+local tipLines = {}
+ldbObj.OnTooltipShow({ AddLine = function(_, t) tipLines[#tipLines + 1] = t end })
+check("tooltip title", tipLines[1] == "UI Snapshot" and #tipLines >= 2)
 -- hide / show via command and checkbox
 SlashCmdList['UISNAPSHOT']("minimap off")
 check("/uisnap minimap off hides and saves", not mb:IsShown() and NS.db().settings.minimap.hide == true)
@@ -282,6 +267,10 @@ check("/uisnap minimap on shows again", mb:IsShown() and NS.db().settings.minima
 SlashCmdList['UISNAPSHOT']("minimap")
 check("/uisnap minimap toggles", not mb:IsShown())
 SlashCmdList['UISNAPSHOT']("minimap")
+check("angle kept after hide/show", near(NS.db().settings.minimap.minimapPos, 90))
+SlashCmdList['UISNAPSHOT']("minimap square")   -- retired argument: toggles, never errors
+check("retired shape argument just toggles", not mb:IsShown())
+SlashCmdList['UISNAPSHOT']("minimap on")
 -- checkboxes in the window
 local win = UISnapshotFrame
 if not win:IsShown() then SlashCmdList['UISNAPSHOT']("") end

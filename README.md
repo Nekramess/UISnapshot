@@ -35,7 +35,7 @@ Copy the `UISnapshot` folder into `World of Warcraft/_classic_beta_/Interface/Ad
 
 After Load, Enable addons and a successful Import, the UI reloads by itself 1.5 seconds later (turn it off with the checkbox). The messages from that run are kept and printed again about 3 seconds after you log back in, so you can see what happened.
 
-The minimap button (gear icon) opens or closes the window on click and can be dragged around the minimap edge. Hide it with the checkbox or `/uisnap minimap off`. It is my own implementation, not a shared library.
+The minimap button (gear icon) opens or closes the window on click and can be dragged around the minimap edge. Hide it with the checkbox or `/uisnap minimap off`. It is registered through the standard LibDBIcon-1.0 library (embedded, with LibStub, CallbackHandler-1.0 and LibDataBroker-1.1), so minimap button managers handle it like any other button and it follows square minimaps through `GetMinimapShape`. Confirmed in the live client on 20 Oct 2026: with Leatrix Plus' "Enhance minimap" on, the old button was replaced and labelled a custom button, the new one is not (author's test).
 
 ## Game settings and action bars
 
@@ -90,6 +90,8 @@ Confirmed in the Forever beta (1 Oct 2026): saving works (chat windows, CVars, a
 `diff` and CVar restore also passed a flip-and-restore test (1 Oct 2026).
 
 **0.6.7:** the minimap button follows square minimaps through `GetMinimapShape` (a function minimap addons define; Forever's own UI source does not). Verified in the mock only; not yet confirmed live.
+
+**0.6.8:** the minimap button is registered through LibDBIcon-1.0 instead of being hand-built (Leatrix Plus' "Enhance minimap" replaced the old button and called it a custom button). Confirmed fixed in the live client on 20 Oct 2026 (author's test with Leatrix Plus).
 
 **0.6.2:** fixes game settings never being captured in full on Forever (wrong function name), which is why Damage Meter and other changed settings were lost. Verified in the mock only; not yet confirmed live.
 
